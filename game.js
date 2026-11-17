@@ -186,7 +186,7 @@ const Game = (() => {
     J.temMoedas = J.comp.specs.some(s => s.k === Patterns.TIPOS.MOEDA);
     J.trapaca = false;
     J.textoMorte = null;
-    if (!J.teste) Save.dados.ultimaFase = fase.id;
+    if (!J.teste && !fase.infinito) Save.dados.ultimaFase = fase.id;
     J.treinoCps = [];
     const reg = regAtual();
     J.dica.ativa = !semSave() && Save.dados.primeiraVez && Levels.indice(fase.id) === 0 && reg.tentativas < 3;
@@ -242,7 +242,7 @@ const Game = (() => {
   // Registro da fase no save. No teste do editor é um de mentira: nada é salvo.
   // Teste do editor e treino não mexem no save: usam um registro de mentira.
   const semSave = () => !!(J.teste || J.treino);
-  function regAtual() { return J.teste ? J.teste.reg : J.treino ? J.treino.reg : Save.fase(J.fase.id); }
+  function regAtual() { return J.teste ? J.teste.reg : J.treino ? J.treino.reg : J.infinito ? J.infinito.reg : Save.fase(J.fase.id); }
   const regFalso = () => ({ melhor: 0, tentativas: 0, vitorias: 0, moedas: [false, false, false] });
 
   // Treino: marca um checkpoint (tempo + onde a alma está); cada morte recomeça do último.
@@ -267,8 +267,38 @@ const Game = (() => {
     }
   }
 
+  // A música da fase (no infinito, em loop: cada volta é um segmento novo).
+  function tocarMusica(desde) { Sound.tocar(J.fase.musica, { desde, vel: Debug.vel, loop: !!J.infinito }); }
+
+  // ------------------------------------------------------- modo infinito --
+  function segmentoInfinito(k) {
+    const inf = J.infinito, tm = J.textoMorte, tr = J.trapaca;
+    inf.k = k;
+    preparar(Infinito.segmento(inf.semente, k, inf.info));
+    J.textoMorte = tm;                     // o tempo da morte continua visível no começo da próxima
+    if (k > 0) J.trapaca = tr;             // trocar de volta não "limpa" o uso de debug
+  }
+  function novaPartidaInfinito() {
+    J.infinito.semente = Math.floor(Math.random() * 1e9);
+    J.infinito.total = 0;
+    segmentoInfinito(0);
+  }
+  // A música deu a volta: o próximo segmento começa limpo, com a alma onde está.
+  function proximoSegmento() {
+    const inf = J.infinito;
+    inf.total += J.comp.duracao;
+    const x = alma.x, y = alma.y;
+    segmentoInfinito(inf.k + 1);
+    J.corrida.reiniciar(0, x, y);
+    J.t = 0; J.batida = 0; J.prog = 0;
+    Flutuantes.add(t('volta', { n: inf.k + 1 }), CX, CY - HH - 10, PAL.ouro, 1.2, 1);
+    Sound.sfx('passouMelhor');
+  }
+  const tempoTxt = (s) => Math.floor(s / 60) + ':' + String(Math.floor(s % 60)).padStart(2, '0');
+
   // Começa (ou recomeça) uma tentativa. Rápido: nada é alocado aqui.
   function comecarTentativa(desdeT) {
+    if (J.infinito) novaPartidaInfinito();
     const reg = regAtual();
     reg.tentativas++;
     if (!semSave()) { Save.dados.stats.tentativas++; Save.gravarDepois(); }
@@ -289,7 +319,7 @@ const Game = (() => {
     for (const r of alma.rastro) { r.x = alma.x; r.y = alma.y; }
     J.t = J.corrida.t;
     J.prog = J.corrida.prog;
-    Sound.tocar(J.fase.musica, { desde: J.t, vel: Debug.vel });
+    tocarMusica(J.t);
     J.batida = J.t / J.comp.B;
     J.estado = 'jogando';
     J.audioParado = 0;
@@ -330,6 +360,7 @@ const Game = (() => {
       } else J.audioParado = 0;
       let t = Sound.posicao();
       if (!Sound.pronto()) t = J.t + dt;          // sem áudio nenhum: relógio de reserva
+      if (J.infinito && t < J.t - 1) { proximoSegmento(); t = Math.max(0, t); }   // a música deu a volta
       if (t < J.t) t = J.t;                       // nunca volta no tempo
       const d = Debug.bot ? Debug.direcaoBot(J.corrida) : Input.direcao();
       entrada.dx = d.x; entrada.dy = d.y; entrada.local = !!Debug.bot;
@@ -354,7 +385,7 @@ const Game = (() => {
         else if (e.tipo === 'moeda') pegarMoeda(e.s);
         else if (e.tipo === 'raspao') raspar(e.o);
         else if (e.tipo === 'morte') { morrer(e); return; }
-        else if (e.tipo === 'vitoria') { vencer(); return; }
+        else if (e.tipo === 'vitoria') { if (J.infinito) proximoSegmento(); else vencer(); return; }
       }
       // passou o recorde nesta tentativa
       const pct = Math.floor(J.prog * 100);
@@ -376,7 +407,7 @@ const Game = (() => {
       if (n > J.contagemTicks) { J.contagemTicks = n; if (n < 3) Sound.sfx('contagem'); }
       if (tempo - J.contagemIni >= passo * 3) {
         Sound.sfx('contagemFim');
-        Sound.tocar(J.fase.musica, { desde: J.pausaPos, vel: Debug.vel });
+        tocarMusica(J.pausaPos);
         J.estado = 'jogando';
       }
     } else if (J.estado === 'vitoria') {
@@ -447,7 +478,15 @@ const Game = (() => {
     const pct = e.pct;
     J.pctMorte = pct;
     const reg = regAtual();
-    if (semSave()) {
+    if (J.infinito) {
+      // recorde do infinito é o tempo aguentado (somando as voltas)
+      const total = J.infinito.total + e.t, inf = Save.dados.infinito;
+      J.recorde = !J.trapaca && total > inf.melhor;
+      if (!J.trapaca) { inf.partidas++; if (J.recorde) inf.melhor = total; }
+      if (contaProgresso()) somarTempo(true);
+      Save.gravar();
+      J.textoMorte = { pct, txt: tempoTxt(total), recorde: J.recorde, ini: tempo };
+    } else if (semSave()) {
       J.recorde = false;
       reg.melhor = Math.max(reg.melhor, pct);
     } else {
@@ -460,7 +499,7 @@ const Game = (() => {
         Save.gravar();                   // recorde não pode se perder se o app fechar agora (B04)
       } else Save.gravarDepois();
     }
-    J.textoMorte = { pct, recorde: J.recorde, ini: tempo };
+    if (!J.infinito) J.textoMorte = { pct, recorde: J.recorde, ini: tempo };
     tremer(CONFIG.juice.tremidaMorte);
     flash(CONFIG.juice.flashMorte, '#ffffff');
     // a alma (ou o reflexo dela, se foi o reflexo que bateu) se desfaz em pixels
@@ -580,6 +619,8 @@ const Game = (() => {
       }
       J.teste = args.teste ? { reg: regFalso(), vitoria: null } : null;
       J.treino = args.treino ? { reg: regFalso(), cps: [] } : null;
+      J.infinito = args.infinito ? { reg: regFalso(), semente: 0, k: 0, total: 0, info: Sound.info(CONFIG.infinito.musica) } : null;
+      if (J.infinito) { J.infinito.info = { bpm: J.infinito.info.bpm, batidas: J.infinito.info.batidas }; novaPartidaInfinito(); args.fase = J.fase; }
       J.inicio = args.teste ? Math.max(0, args.desde || 0) : 0;
       J.inicioX = 0; J.inicioY = 0;
       preparar(args.fase);
@@ -780,7 +821,11 @@ const Game = (() => {
       c.fillRect(mx, by - 2, 1, 8);
     }
     const pct = Math.floor(J.prog * 100);
-    UI.texto(c, pct + '%', bx + bw + 6, by - 1, { cor: PAL.branco, sombra: PAL.preto });
+    if (J.infinito) {
+      UI.texto(c, tempoTxt(J.infinito.total + J.t), bx + bw + 6, by - 1, { cor: PAL.branco, sombra: PAL.preto });
+      UI.texto(c, t('volta', { n: J.infinito.k + 1 }), bx - 6, by - 1, { alinhar: 'direita', cor: PAL.ouro, sombra: PAL.preto });
+      if (Save.dados.infinito.melhor > 0) UI.texto(c, t('melhorTempo', { t: tempoTxt(Save.dados.infinito.melhor) }), CX, by + 8, { alinhar: 'centro', cor: PAL.cinzaClaro, sombra: PAL.preto });
+    } else UI.texto(c, pct + '%', bx + bw + 6, by - 1, { cor: PAL.branco, sombra: PAL.preto });
     // moedas da fase
     const reg = regAtual();
     if (J.temMoedas) {
@@ -820,7 +865,7 @@ const Game = (() => {
         const pop = u < 0.08 ? 1 + (0.08 - u) * 6 : 1;
         c.globalAlpha = fade;
         const yPct = CY - HH + (tm.recorde ? 30 : 16);
-        UI.texto(c, tm.pct + '%', CX, yPct, { escala: Math.round(6 * pop), alinhar: 'centro', cor: tm.recorde ? PAL.ouro : PAL.branco, sombra: PAL.preto });
+        UI.texto(c, tm.txt || tm.pct + '%', CX, yPct, { escala: Math.round(6 * pop), alinhar: 'centro', cor: tm.recorde ? PAL.ouro : PAL.branco, sombra: PAL.preto });
         if (tm.recorde) {
           if (Math.floor(u * 6) % 2 === 0 || u > 0.6) {
             UI.texto(c, t('novoRecorde'), CX, CY - HH + 10, { escala: 2, alinhar: 'centro', cor: PAL.ouro, sombra: PAL.preto });
@@ -842,7 +887,8 @@ const Game = (() => {
     c.globalAlpha = 0.72; c.fillStyle = PAL.preto; c.fillRect(0, 0, W, H); c.globalAlpha = 1;
     UI.painel(c, (W - 190) / 2, 52, 190, 146, { fundo: PAL.fundo2, borda: PAL.branco });
     UI.texto(c, t('pausado'), CX, 62, { escala: 2, alinhar: 'centro', cor: PAL.branco });
-    UI.texto(c, J.fase.nome + ' · ' + Math.floor(J.prog * 100) + '%', CX, 84, { alinhar: 'centro', cor: J.cor });
+    const nomePausa = J.infinito ? t('infinito') + ' · ' + tempoTxt(J.infinito.total + J.t) : J.fase.nome + ' · ' + Math.floor(J.prog * 100) + '%';
+    UI.texto(c, nomePausa, CX, 84, { alinhar: 'centro', cor: J.cor });
     if (J.avisoAudio) UI.texto(c, t('audioInterrompido'), CX, 206, { alinhar: 'centro', cor: PAL.ouro, sombra: PAL.preto });
     J.controles.desenhar(c, tempo);
   }
@@ -917,6 +963,8 @@ const Game = (() => {
   function testar(fase, desde) { irPara('jogo', { fase, desde, teste: true }); }
   // Treino: checkpoints à vontade, nada conta (recorde, moedas, missões, mapa de mortes).
   function treinar(fase) { irPara('jogo', { fase, treino: true }); }
+  // Modo infinito: segmentos gerados a cada volta da música, recorde de tempo.
+  function infinito() { irPara('jogo', { infinito: true }); }
 
   // ========================================================== LOOP ==========
   function loop(ms) {
@@ -1016,7 +1064,7 @@ const Game = (() => {
   }
 
   return {
-    init, irPara, jogar, testar, treinar, tremer, flash, desenharFundo, Particulas, notificar, progresso,
+    init, irPara, jogar, testar, treinar, infinito, tremer, flash, desenharFundo, Particulas, notificar, progresso,
     get tempo() { return tempo; },
     get frame() { return frame; },
     get nomeTela() { return nomeTela; },
@@ -1035,7 +1083,7 @@ const Game = (() => {
       J.trapaca = true;
       const t0 = Math.max(0, Math.min(0.999, pct)) * J.comp.duracao;
       J.corrida.reiniciar(t0);
-      Sound.tocar(J.fase.musica, { desde: t0, vel: Debug.vel });
+      tocarMusica(t0);
       J.t = t0; J.batida = t0 / J.comp.B; J.prog = J.corrida.prog; J.estado = 'jogando'; J.controles.limpar();
     },
     W, H, CX, CY, HW, HH,

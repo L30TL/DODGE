@@ -88,6 +88,9 @@ const TEXTOS = {
     molduras: { bronze: 'BRONZE', prata: 'PRATA', ouro: 'OURO', arcoiris: 'ARCO-ÍRIS', fogo: 'FOGO' },
     moldurasComo: { bronze: 'VENÇA 1 FASE', prata: 'VENÇA 3 FASES', ouro: 'AS 3 MOEDAS DE UMA FASE', arcoiris: '10 MISSÕES', fogo: 'VENÇA UM DEMÔNIO' },
     treino: 'TREINO',
+    infinito: 'INFINITO',
+    volta: 'VOLTA {n}',
+    melhorTempo: 'MELHOR {t}',
     treinoDica: 'TREINO · C (OU A BANDEIRA): CHECKPOINT · V: TIRAR',
     checkpoint: 'CHECKPOINT!',
     checkpointTirado: 'CHECKPOINT TIRADO',
@@ -1065,6 +1068,7 @@ UI.telas.fases = (() => {
     C.botao({ x: 402, y: CART.y + CART.h / 2 - 20, w: 26, h: 40, icone: Sprites.desenho('setaDir', PAL.branco), acao: () => mudar(1) });
     const pri = C.botao({ x: 180, y: 216, w: 120, h: 22, texto: t('jogar'), escala: 2, primario: true, cor: PAL.alma, acao: jogar });
     C.botao({ x: 330, y: 6, w: 64, h: 16, texto: t('criar'), icone: Sprites.desenho('lapis', PAL.branco), acao: () => { Sound.sfx('confirmar'); Game.irPara('criadas'); } });
+    C.botao({ x: 72, y: 6, w: 76, h: 16, texto: t('infinito'), cor: PAL.ouro, acao: () => { Sound.sfx('confirmar'); Game.infinito(); } });
     C.botao({ x: 306, y: 218, w: 66, h: 20, texto: t('treino'), icone: Sprites.desenho('bandeira', PAL.verde), acao: () => jogar(true) });
     C.botao({ x: 14, y: 218, w: 80, h: 20, texto: t('visual'), icone: Sprites.desenho('cabide', PAL.branco), acao: () => { Sound.sfx('confirmar'); Game.irPara('visual'); } });
     C.botao({ x: 386, y: 218, w: 80, h: 20, texto: t('missoes'), icone: Sprites.desenho('trofeu', PAL.ouro), acao: () => { Sound.sfx('confirmar'); Game.irPara('missoes'); } });

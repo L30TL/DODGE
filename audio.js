@@ -665,7 +665,9 @@ const Sound = (() => {
     posicao() {
       if (!ctx || !toc.musica) return 0;
       const p = toc.ancoraPos + (API.agora() - API.latencia() - toc.ancoraCtx) * toc.vel;
-      return toc.loop ? ((p % toc.musica.duracao) + toc.musica.duracao) % toc.musica.duracao : p;
+      // em loop, só dá a volta depois que a música começou (antes da 1ª nota a posição é negativa:
+      // se desse a volta viraria "quase no fim" e o jogo pularia a volta inteira)
+      return toc.loop && p > 0 ? p % toc.musica.duracao : p;
     },
 
     // Muda a velocidade (câmera lenta do debug) mantendo a posição.

@@ -52,6 +52,24 @@ const PASTA = process.argv[2] || os.tmpdir();
   conferir(!bronze, 'moldura bronze ainda travada (nenhuma vitória)');
   await page.waitForTimeout(300);
   await foto('2-perfil');
+  // modo infinito: dá a volta na música (segmento novo, a alma continua), morre e grava o tempo
+  await page.evaluate(() => Game.irPara('fases')); await page.waitForTimeout(200);
+  await clicar(72 + 38, 14, 600);                                          // INFINITO
+  const inf0 = await page.evaluate(() => ({ tela: Game.nomeTela, k: Game.J.infinito && Game.J.infinito.k, loop: Sound._estado ? true : true }));
+  conferir(inf0.tela === 'jogo' && inf0.k === 0, `INFINITO começa na volta 1 (${JSON.stringify(inf0)})`);
+  await page.evaluate(() => { const d = Game.J.comp.duracao; Game.J.corrida.t = d - 0.4; Game.J.corrida.alma.x = 50;
+    Sound.tocar(Game.J.fase.musica, { desde: d - 0.4, loop: true }); });
+  await page.waitForTimeout(1500);
+  const inf1 = await page.evaluate(() => ({ k: Game.J.infinito.k, estado: Game.J.estado, t: Game.J.t, total: Game.J.infinito.total, x: Game.J.corrida.alma.x }));
+  conferir(inf1.k === 1 && inf1.estado === 'jogando' && inf1.t < 3 && inf1.total > 70, `a música deu a volta: trecho novo e o jogo segue (${JSON.stringify(inf1)})`);
+  await foto('3-infinito-volta2');
+  await page.evaluate(() => Game.matar()); await page.waitForTimeout(500);
+  const rec = await page.evaluate(() => ({ melhor: Save.dados.infinito.melhor, partidas: Save.dados.infinito.partidas, txt: Game.J.textoMorte && Game.J.textoMorte.txt }));
+  conferir(rec.melhor > 70 && rec.partidas === 1 && /^1:\d\d$/.test(rec.txt), `morreu: recorde de tempo gravado (${JSON.stringify(rec)})`);
+  await foto('4-infinito-morte');
+  await page.waitForTimeout(700);
+  const re2 = await page.evaluate(() => ({ k: Game.J.infinito.k, total: Game.J.infinito.total, estado: Game.J.estado }));
+  conferir(re2.k === 0 && re2.total === 0 && re2.estado === 'jogando', `nova partida começa da volta 1 (${JSON.stringify(re2)})`);
   conferir(erros.length === 0, 'nenhum erro no console' + (erros.length ? ': ' + erros.join(' | ') : ''));
   console.log(falhas.length ? `\n${falhas.length} FALHA(S)` : '\nOK');
   await browser.close();

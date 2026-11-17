@@ -161,3 +161,10 @@ Encontrados na auditoria da Etapa 0 (17/11/2026). "Sonda" = teste de navegador q
 - **Causa:** a busca do tipo usava `ESQUEMA[tipo]` / `GERADORES[tipo]` sem conferir se a chave é do próprio objeto.
 - **Correção:** toda busca de tipo usa `hasOwnProperty` (`tem(obj, k)` no `patterns.js`).
 - **Teste:** `tests/codigo.test.js` › código malicioso (e o fuzz de `tests/padroes.test.js` agora também sorteia esses tipos).
+
+## B23 — Música em loop: antes da primeira nota a posição "dava a volta" pro fim · corrigido (0.6.0)
+- **Encontrado:** na Sessão 5, no teste de navegador do modo infinito (a 1ª volta pulava sozinha).
+- **Reproduzir:** tocar uma música com `loop: true` e ler `Sound.posicao()` nos primeiros milissegundos (antes da 1ª nota agendada): vinha ~74,97 s em vez de um número negativo.
+- **Causa:** a posição em loop fazia o módulo da duração também nos valores negativos.
+- **Correção:** em loop, a posição só dá a volta depois que a música começou (negativo continua negativo, e o jogo segura o tempo).
+- **Teste:** `tools/navegador/sessao5.js` › INFINITO começa na volta 1.

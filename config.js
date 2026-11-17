@@ -141,6 +141,17 @@ const CONFIG = {
     estrelasDemon: 20,      // estrelas pra abrir as fases Demônio
   },
 
+  // ------------------------------------------------------------ infinito -----
+  infinito: {
+    musica: 'correnteza',   // toca em loop; cada volta da música é um trecho novo
+    nivelInicial: 0.2,      // dificuldade da 1ª volta (0 a 1)
+    nivelPorVolta: 0.16,    // quanto sobe a cada volta (chega no máximo na 6ª)
+    calmaInicio: 6,         // batidas sem nada no começo da partida
+    folgaFim: 10,           // batidas livres antes da virada da música (nada cruza a volta)
+    respiroMin: 2,          // batidas entre um ataque e o próximo, no nível máximo
+    respiroMax: 5,          // ...e no começo
+  },
+
   // ------------------------------------------------------------ economia -----
   // Moedas comuns só compram VISUAL (nada dá vantagem; nada custa dinheiro de verdade).
   // Só contam nas fases oficiais e sem debug.
