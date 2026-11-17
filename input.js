@@ -9,6 +9,7 @@
 const Input = (() => {
   const W = CONFIG.tela.largura, H = CONFIG.tela.altura;
   const seguradas = {};                 // código da tecla -> true
+  const apertos = new Set();            // teclas apertadas desde o último frame (toque rápido não se perde)
   let canvas = null;
   let destino = null;                   // função(evento) da tela atual
   // arrasto atual: total andado desde que o dedo/mouse encostou (px lógicos)
@@ -47,6 +48,7 @@ const Input = (() => {
       const ctrl = ev.ctrlKey || ev.metaKey;
       if (k || ev.code === 'Tab' || (ctrl && Input.atalhos && /^Key[ZYSDCVA]$/.test(ev.code))) ev.preventDefault();
       seguradas[ev.code] = true;
+      if (!ev.repeat) apertos.add(ev.code);
       emitir({ t: 'tecla', k: k || null, code: ev.code, repetida: ev.repeat, ctrl, shift: ev.shiftKey });
     });
     window.addEventListener('keyup', (ev) => { seguradas[ev.code] = false; });
@@ -129,5 +131,8 @@ const Input = (() => {
     arrasto() { return { ativo: arrasto.id !== null, tipo: arrasto.tipo, totalX: arrasto.totalX, totalY: arrasto.totalY, sessao: arrasto.sessao }; },
     arrastando() { return arrasto.id !== null; },
     segurada(code) { return !!seguradas[code]; },
+    // apertou alguma dessas teclas desde o último frame? (o jogo limpa no fim de cada frame)
+    apertou(...codes) { for (const c of codes) if (apertos.has(c)) return true; return false; },
+    limparApertos() { apertos.clear(); },
   };
 })();

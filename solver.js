@@ -273,6 +273,10 @@ const Solver = (() => {
   // (que mira na alma de verdade), refaz com as teleguiadas mirando nesse caminho.
   // Devolve { ok, analise, caminho, passadas, morte }.
   function provar(fase, passadas) {
+    if (precisaBusca(fase)) {
+      const b = buscar(fase);
+      return { ok: b.ok, entradas: b.entradas, passadas: 1, morte: b.morte || null, busca: true, analise: { ok: b.ok, morreuEm: b.morreuEm } };
+    }
     let almaEm = null, forcar = null, a = null, rep = null;
     for (let p = 0; p < (passadas || CONFIG.solver.passadas); p++) {
       a = analisar(fase, { caminho: true, almaEm, forcar });
@@ -293,6 +297,150 @@ const Solver = (() => {
     return { ok: false, analise: a, caminho: a.caminho, passadas: passadas || CONFIG.solver.passadas, morte: rep.morte };
   }
 
+  // ------------------------------------------------------------- BUSCA ---
+  // Prova pra QUALQUER modo da alma (gravidade, gelo, trilhos, escudo...): uma busca em feixe
+  // com a física de verdade. Os candidatos andam juntos no tempo (os ataques são os mesmos pra
+  // todos); a cada decisão (CONFIG.solver.busca.quadros quadros) cada um tenta as entradas do
+  // modo; ficam os mais longe do perigo, um por "balde" (lugar + velocidade). Quem chega no fim
+  // tem a sequência de entradas, e ela é rejogada na Sim.Corrida pra confirmar (prova construtiva).
+  const ENTRADAS = {
+    livre: [], gravidade: [], trilhos: [], escudo: [0, 1, 2, 3].map(e => ({ escudo: e })),
+  };
+  for (let dx = -1; dx <= 1; dx++) for (let dy = -1; dy <= 1; dy++) ENTRADAS.livre.push({ dx, dy });
+  for (let dx = -1; dx <= 1; dx++) for (const pulo of [false, true]) ENTRADAS.gravidade.push({ dx, pulo });
+  for (let dx = -1; dx <= 1; dx++) for (let tr = -1; tr <= 1; tr++) ENTRADAS.trilhos.push({ dx, trilho: tr });
+  const entradasDo = (m) => ENTRADAS[m] || ENTRADAS.livre;            // mini e gelo: as 8 direções + parado
+
+  const CAMPOS_ALMA = ['x', 'y', 'vx', 'vy', 'chao', 'tChao', 'bufferPulo', 'trilho', 'trilhoAlvo', 'escudo'];
+  const copiarAlma = (de, para) => { for (const k of CAMPOS_ALMA) para[k] = de[k]; return para; };
+
+  // O candidato morre aqui? (sem mexer em nada dos ataques; no escudo, o que o escudo dele cobre não conta)
+  function colide(r, t, x, y, escudo) {
+    const at = r.at, T = Patterns.TIPOS, rHit = r.raioHit(), S = CONFIG.modos.escudo;
+    const dirX = [0, 1, 0, -1][escudo | 0], dirY = [-1, 0, 1, 0][escudo | 0], cosMin = Math.cos(S.abertura / 2 * Math.PI / 180);
+    for (let i = 0; i < at.n; i++) {
+      const o = at.vivos[i], s = o.s;
+      if (o.morto || s.k === T.MOEDA || s.k === T.PLATAFORMA || s.k === T.ORBE || s.k === T.EMISSOR) continue;
+      if (s.k === T.BALA) {
+        if (t < s.t0) continue;
+        const bx = at.xBala(o, t) - x, by = at.yBala(o, t) - y, d = Math.hypot(bx, by);
+        if (d - s.hr >= rHit + 0.5) continue;
+        if (r.modo === 'escudo') {
+          // já passou do centro sem matar = foi bloqueado antes (no jogo ele some)
+          const bx2 = at.xBala(o, t - 0.005) - x, by2 = at.yBala(o, t - 0.005) - y, d2 = Math.hypot(bx2, by2);
+          if (d2 < d) continue;
+          // de que lado ele vem (bem no centro, usa onde ele estava um instante antes)
+          const ux = d > 0.5 ? bx : bx2, uy = d > 0.5 ? by : by2, du = d > 0.5 ? d : d2;
+          if (du > 1e-6 && (ux * dirX + uy * dirY) / du >= cosMin) continue;            // o escudo dele pega
+        }
+        return true;
+      }
+      if (at.distancia(o, t, x, y) < rHit + 0.5) return true;
+    }
+    return false;
+  }
+  // distância até o perigo mais perto (pra escolher os candidatos mais seguros)
+  function folga(r, t, x, y) {
+    const at = r.at, T = Patterns.TIPOS;
+    let m = 60;
+    for (let i = 0; i < at.n; i++) {
+      const o = at.vivos[i], s = o.s;
+      if (o.morto || s.k === T.MOEDA || s.k === T.PLATAFORMA || s.k === T.ORBE || s.k === T.EMISSOR) continue;
+      const d = at.distancia(o, Math.max(t, s.t0), x, y);    // o que ainda vai ativar também assusta
+      if (d < m) m = d;
+    }
+    return m;
+  }
+
+  function Busca(fase, op) {
+    op = op || {};
+    const Bc = Object.assign({}, CONFIG.solver.busca, op), dt = 1 / 60;
+    const comp = Patterns.compilar(fase, CONFIG.caixa);
+    const r = new Sim.Corrida(comp);                       // motor de física: a alma é trocada por cada candidato
+    const at = r.at;
+    const lider = { x: 0, y: 0 };
+    const a0 = copiarAlma(r.alma, {});
+    let cands = [{ a: a0, modo: r.modo, hist: null }];
+    const quadrosTotal = Math.ceil(comp.duracao / dt);
+    let q = 0, morreuEm = null;
+    const self = {
+      resultado: null,
+      get progresso() { return Math.min(1, q / quadrosTotal); },
+      avancar(limiteMs) {
+        if (self.resultado) return true;
+        const fim = limiteMs === undefined ? Infinity : agora() + limiteMs;
+    while (q < quadrosTotal && morreuEm === null) {
+      // filhos: cada candidato × cada entrada do modo
+      const m = cands[0].modo;
+      const filhos = [];
+      for (const c of cands) for (const e of entradasDo(c.modo)) filhos.push({ a: copiarAlma(c.a, {}), modo: c.modo, e, pai: c, vivo: true });
+      for (let f = 0; f < Bc.quadros && q < quadrosTotal; f++, q++) {
+        const t = Math.min(comp.duracao, (q + 1) * dt);
+        Patterns.estadoCaixa(comp, t, r.est);
+        r.lim.x = Math.max(2, comp.hw * r.est.largura - CONFIG.alma.margemParede);
+        r.lim.y = Math.max(2, comp.hh * r.est.altura - CONFIG.alma.margemParede);
+        at.atualizar(t, dt, lider);
+        r._tMover = t;
+        for (const fi of filhos) {
+          if (!fi.vivo) continue;
+          copiarAlma(fi.a, r.alma); r.modo = fi.modo;
+          if (r.est.modo !== r.modo) r.entrarModo(r.est.modo);
+          const e = fi.e;
+          const ent = { dx: e.dx || 0, dy: e.dy || 0, local: true, pulo: !!e.pulo, trilho: f === 0 ? (e.trilho || 0) : 0, escudo: e.escudo !== undefined ? e.escudo : -1 };
+          const x0 = r.alma.x, y0 = r.alma.y;
+          r.mover(dt, ent);
+          const xm = (x0 + r.alma.x) / 2, ym = (y0 + r.alma.y) / 2;
+          if (colide(r, t - dt / 2, xm, ym, r.alma.escudo) || colide(r, t, r.alma.x, r.alma.y, r.alma.escudo)) { fi.vivo = false; continue; }
+          copiarAlma(r.alma, fi.a); fi.modo = r.modo;
+        }
+      }
+      // poda: um por balde (lugar + velocidade + estado do modo), os mais folgados primeiro
+      const tAgora = Math.min(comp.duracao, q * dt);
+      const baldes = new Map();
+      for (const fi of filhos) {
+        if (!fi.vivo) continue;
+        fi.nota = folga(r, tAgora, fi.a.x, fi.a.y) - 0.01 * Math.hypot(fi.a.x, fi.a.y);
+        const k = Math.round(fi.a.x / Bc.balde) + ',' + Math.round(fi.a.y / Bc.balde) + ',' + Math.round((fi.a.vx || 0) / Bc.baldeVel) + ',' +
+          Math.round((fi.a.vy || 0) / Bc.baldeVel) + ',' + (fi.a.trilhoAlvo | 0) + ',' + (fi.a.escudo | 0) + ',' + (fi.a.chao ? 1 : 0);
+        const ja = baldes.get(k);
+        if (!ja || ja.nota < fi.nota) baldes.set(k, fi);
+      }
+      const vivos = Array.from(baldes.values()).sort((x, y) => y.nota - x.nota).slice(0, Bc.maxCandidatos);
+      if (!vivos.length) { morreuEm = tAgora; break; }
+      cands = vivos.map(fi => ({ a: fi.a, modo: fi.modo, hist: { e: fi.e, pai: fi.pai.hist } }));
+      lider.x = cands[0].a.x; lider.y = cands[0].a.y;
+      if (agora() > fim) return false;
+    }
+        if (morreuEm !== null) { self.resultado = { ok: false, morreuEm, duracao: comp.duracao }; return true; }
+        // a sequência de entradas do melhor candidato, rejogada na simulação de verdade
+        const entradas = [];
+        for (let h = cands[0].hist; h; h = h.pai) entradas.push(h.e);
+        entradas.reverse();
+        const rep = repetirEntradas(fase, entradas);
+        self.resultado = { ok: rep.estado === 'vitoria', entradas, morte: rep.morte, morreuEm: rep.morte ? rep.morte.t : null, duracao: comp.duracao };
+        return true;
+      },
+    };
+    return self;
+  }
+  function buscar(fase, op) { const b = Busca(fase, op); b.avancar(); return b.resultado; }
+
+  // A fase usa um modo em que só a busca com a física de verdade vale?
+  const MODOS_BUSCA = { gravidade: 1, gelo: 1, trilhos: 1, escudo: 1 };
+  const precisaBusca = (fase) => (fase.eventos || []).some(ev => ev && ev.tipo === 'modo' && MODOS_BUSCA[ev.modo]);
+
+  // Joga a fase de verdade com essas entradas (uma por decisão de CONFIG.solver.busca.quadros quadros).
+  function repetirEntradas(fase, entradas) {
+    const Bc = CONFIG.solver.busca, dt = 1 / 60;
+    const r = new Sim.Corrida(Patterns.compilar(fase, CONFIG.caixa));
+    for (let q = 0; r.estado === 'jogando' && q < entradas.length * Bc.quadros + Bc.quadros + 2; q++) {
+      const e = entradas[Math.min(entradas.length - 1, Math.floor(q / Bc.quadros))] || {};
+      r.passo((q + 1) * dt, { dx: e.dx || 0, dy: e.dy || 0, local: true, pulo: !!e.pulo,
+        trilho: q % Bc.quadros === 0 ? (e.trilho || 0) : 0, escudo: e.escudo !== undefined ? e.escudo : -1 });
+    }
+    return { estado: r.estado, morte: r.morte };
+  }
+
   // Análise inteira de uma vez (testes, ferramentas).
   function analisar(fase, op) {
     const a = Analise(fase, op);
@@ -300,5 +448,5 @@ const Solver = (() => {
     return a.resultado;
   }
 
-  return { Analise, analisar, noCaminho, repetir, provar };
+  return { Analise, analisar, noCaminho, repetir, provar, Busca, buscar, repetirEntradas, precisaBusca };
 })();

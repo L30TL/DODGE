@@ -9,7 +9,7 @@
 // =============================================================================
 
 const CONFIG = {
-  versao: '0.7.0-dev',     // versão do jogo (aparece na tela inicial e no registro de erros)
+  versao: '0.8.0-dev',     // versão do jogo (aparece na tela inicial e no registro de erros)
 
   // ---------------------------------------------------------------- tela -----
   tela: {
@@ -61,7 +61,9 @@ const CONFIG = {
       coiote: 0.08,         // s — ainda dá pra pular logo depois de sair da beirada
       buffer: 0.12,         // s — apertar o pulo um pouco antes de cair no chão vale
     },
-    trilhos: { linhas: 3, alcance: 0.8, velTroca: 520 },   // linhas padrão, quanto da altura elas ocupam, px/s
+    trilhos: { linhas: 3, alcance: 0.8, velTroca: 520,   // linhas padrão, quanto da altura elas ocupam, px/s
+      repetirS: 0.22,       // s — segurando ↑/↓, troca de novo a cada tanto
+      arrasteTroca: 14 },   // px — arrastar o dedo isso na vertical troca de trilho
     escudo: { raio: 13, abertura: 100, velCentro: 600 },   // px, graus, px/s (a alma vai pro centro)
     plataforma: { espessura: 4 },                         // px
     portalAvisoBatidas: 2,  // batidas de aviso antes de trocar de modo (se a fase não disser)
@@ -209,6 +211,8 @@ const CONFIG = {
     passo: 1 / 60,          // s — passo de tempo do solver (em cada passo a alma anda 1 célula da grade)
     margem: 0.5,            // px — o solver considera a hitbox da alma esse tanto maior (conservador)
     passadas: 3,            // provar: até quantas vezes refaz o caminho com as teleguiadas mirando nele
+    // busca com a física de verdade (modos gravidade, gelo, trilhos, escudo...)
+    busca: { quadros: 4, maxCandidatos: 200, balde: 8, baldeVel: 60 },
   },
 
   // ------------------------------------------------------------- limites -----

@@ -124,3 +124,23 @@ test('portal: troca de modo na batida certa e volta pro livre; determinístico',
   assert.strictEqual(jogar(), jogar());
   assert.strictEqual(Patterns.validar(f).avisos.length, 0);
 });
+
+test('solver: a busca com a física de verdade prova uma fase de cada modo e recusa a impossível', { timeout: 120000 }, () => {
+  const S = carregar(['config.js', 'patterns.js', 'sim.js', 'levels.js', 'solver.js']).pegar('Solver');
+  const portal = (modo, extra) => Object.assign({ batida: 0.5, tipo: 'modo', modo, aviso: 0 }, extra || {});
+  const casos = {
+    gravidade: [portal('gravidade'), { batida: 8, tipo: 'laser', pos: 0.85, orient: 'h', larg: 16, aviso: 3, dur: 0.5 }, { batida: 14, tipo: 'chuva', pos: [-0.2, 0.2], de: 'cima', aviso: 2 }],
+    gelo: [portal('gelo'), { batida: 8, tipo: 'laser', pos: 0, orient: 'v', larg: 60, aviso: 3, dur: 2 }],
+    trilhos: [portal('trilhos'), { batida: 8, tipo: 'laser', pos: 0, orient: 'h', larg: 20, aviso: 2, dur: 2 }],
+    escudo: [portal('escudo'), { batida: 8, tipo: 'chuva', pos: 0, de: 'direita', aviso: 2 }, { batida: 12, tipo: 'chuva', pos: 0, de: 'cima', aviso: 2 }],
+  };
+  for (const [nome, ev] of Object.entries(casos)) {
+    const f = { id: nome, bpm: 120, duracaoBatidas: 24, eventos: ev };
+    assert.ok(S.precisaBusca(f), nome);
+    const p = S.provar(f);
+    assert.ok(p.ok && p.busca, `${nome}: não provada (batida ${p.analise.morreuEm / 0.5})`);
+  }
+  const impossivel = { id: 'x', bpm: 120, duracaoBatidas: 24, eventos: [portal('escudo'),
+    { batida: 8, tipo: 'chuva', pos: 0, de: 'direita', aviso: 2 }, { batida: 8, tipo: 'chuva', pos: 0, de: 'esquerda', aviso: 2 }] };
+  assert.ok(!S.provar(impossivel).ok, 'tiros dos dois lados ao mesmo tempo: o escudo não segura');
+});

@@ -189,3 +189,10 @@ Encontrados na auditoria da Etapa 0 (17/11/2026). "Sonda" = teste de navegador q
 - **Causa:** no modo FECHAR o centro é um número, mas o valor continuava sendo a lista do modo BURACO; somar o passo numa lista dá NaN.
 - **Correção:** as setinhas de campo numérico usam o primeiro valor quando encontram uma lista (e o padrão se o valor não for um número).
 - **Teste:** `tests/fuzz.test.js` (3 sementes × 1500 operações aleatórias no editor).
+
+## B27 — Toque ou tecla rápidos se perdiam entre dois frames · corrigido (0.8.0)
+- **Encontrado:** na Sessão 7, no teste de navegador dos modos (um clique rápido não fazia a alma pular; ↓ rápido não trocava de trilho).
+- **Reproduzir:** no modo gravidade, um toque/clique bem rápido (apertar e soltar antes do próximo frame); ou apertar ↓ rapidinho no modo trilhos.
+- **Causa:** o jogo só olhava o que estava apertado NA HORA do frame; o que começava e terminava entre dois frames não existia.
+- **Correção:** a entrada guarda as teclas apertadas desde o último frame (`Input.apertou`), e cada toque novo conta pelo número da sessão do toque (mesmo que já tenha soltado).
+- **Teste:** `tools/navegador/modos.js` (clique rápido pula; ↓ rápido troca de trilho).

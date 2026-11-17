@@ -2,6 +2,23 @@
 
 O que mudou em cada versão. Bugs com número (B01…) estão detalhados em `BUGS.md`.
 
+## 0.8.0-dev — Overhaul, Sessão 7: modos da alma (17/11/2026)
+
+### Modos da alma (trocados por portais no meio da fase)
+- **Gravidade**: a alma cai e pula (↑, W, Espaço ou um toque na tela; segurando, pula de novo ao cair). O dedo arrastando anda pros lados. Pode cair pra cima. **Plataformas** surgem na caixa (dá pra subir atravessando por baixo e ficar em cima).
+- **Trilhos**: presa em 3 a 5 linhas; ↑/↓ ou arrastar o dedo na vertical troca de linha, deslizando.
+- **Escudo**: a alma fica no centro e um escudo bloqueia o que vem do lado escolhido (setas, ou tocar no lado de onde vem o ataque).
+- **Gelo**: desliza com inércia e quica nas paredes.
+- **Mini**: a alma encolhe (hitbox menor) e fica mais rápida.
+- Antes de trocar de modo, o ícone do modo novo pisca no alto da caixa.
+- No editor: eventos **PORTAL** e **PLATAFORMA**.
+
+### Solver
+- **Busca com a física de verdade** pra provar fases com gravidade, gelo, trilhos ou escudo: vários candidatos andando juntos no tempo, os mais seguros ficam, e a sequência de comandos achada é rejogada no jogo de verdade. O editor usa ela na verificação; no debug, S assiste.
+
+### Correções
+- Um toque ou uma tecla rápidos (começando e terminando entre dois frames) se perdiam; com os modos novos isso fazia o pulo ou a troca de trilho não acontecer (B27).
+
 ## 0.7.0-dev — Overhaul, Sessão 6: fim da Etapa 1 (17/11/2026)
 
 ### Solver novo

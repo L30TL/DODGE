@@ -97,13 +97,31 @@ const Debug = (() => {
     // mais segura. Só enxerga o que já está na tela (avisos), como um jogador.
     // Bot que segue o caminho do solver (tecla S no debug): devolve o alvo pra entrada, ou null.
     caminho: null,
-    alvoSolver(t, out) { return D.caminho ? Solver.noCaminho(D.caminho, t, out) : null; },
+
     assistirSolver(fase) {
       const p = Solver.provar(fase);
-      D.caminho = p.caminho || null;
+      D.caminho = p.caminho || (p.entradas ? { entradas: p.entradas } : null);
       D.bot = false;
       return p;
     },
+    // entrada do solver no tempo t: segue o caminho (modo livre) ou repete as entradas da busca (outros modos)
+    entradaSolver(t, ent) {
+      const c = D.caminho;
+      if (!c) return false;
+      if (c.entradas) {
+        const q = CONFIG.solver.busca.quadros, i = Math.floor(t * 60 / q), e = c.entradas[Math.min(c.entradas.length - 1, i)] || {};
+        ent.dx = e.dx || 0; ent.dy = e.dy || 0; ent.local = true; ent.temAlvo = false;
+        ent.pulo = !!e.pulo; ent.escudo = e.escudo !== undefined ? e.escudo : -1;
+        ent.trilho = i !== D._ultimaDecisao ? (e.trilho || 0) : 0;
+        D._ultimaDecisao = i;
+        return true;
+      }
+      Solver.noCaminho(c, t, D._alvo);
+      ent.dx = 0; ent.dy = 0; ent.local = true; ent.temAlvo = true; ent.alvoX = D._alvo.x; ent.alvoY = D._alvo.y;
+      ent.pulo = false; ent.trilho = 0; ent.escudo = -1;
+      return true;
+    },
+    _alvo: { x: 0, y: 0 }, _ultimaDecisao: -1,
     direcaoBot(corrida) {
       return bot(corrida.alma, corrida.at, corrida.t, corrida.lim, 0, corrida.est.espelho);
     },

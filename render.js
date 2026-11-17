@@ -6,7 +6,7 @@
 // =============================================================================
 
 const Render = (() => {
-  const { BALA, LASER, PAREDE, MURO, ORBE, EMISSOR, MOEDA } = Patterns.TIPOS;
+  const { BALA, LASER, PAREDE, MURO, ORBE, EMISSOR, MOEDA, PLATAFORMA } = Patterns.TIPOS;
   const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
   const bordaParede = Patterns.bordaParede;
 
@@ -17,6 +17,16 @@ const Render = (() => {
     const vivos = at.vivos, n = at.n;
     // 1) avisos
     avisos(ctx, at, t, batida, op);
+    // 1b) plataformas (modo gravidade): barra firme com a beirada de cima clara
+    for (let i = 0; i < n; i++) {
+      const o = vivos[i], s = o.s;
+      if (s.k !== PLATAFORMA || t < s.t0 || t >= s.tF) continue;
+      const esp = CONFIG.modos.plataforma.espessura, x0 = Math.round(s.x - s.larg / 2), y0 = Math.round(s.y);
+      ctx.globalAlpha = s.tF - t < 0.25 ? (s.tF - t) / 0.25 : 1;
+      ctx.fillStyle = PAL.azul; ctx.fillRect(x0, y0, Math.round(s.larg), esp);
+      ctx.fillStyle = PAL.almaClara; ctx.fillRect(x0, y0, Math.round(s.larg), 1);
+      ctx.globalAlpha = 1;
+    }
     // 2) paredes e muros
     for (let i = 0; i < n; i++) {
       const o = vivos[i], k = o.s.k;
@@ -36,7 +46,7 @@ const Render = (() => {
       const limX = hw + 12, limY = hh + 12;
       for (let i = 0; i < n; i++) {
         const o = vivos[i], s = o.s;
-        if (s.k !== BALA || t < s.t0) continue;
+        if (s.k !== BALA || t < s.t0 || o.morto) continue;
         if (o.x < -limX || o.x > limX || o.y < -limY || o.y > limY) continue;
         ctx.drawImage(spriteBala(s, at.destaque === o && op.piscaMorte), (o.x - s.r + 0.5) | 0, (o.y - s.r + 0.5) | 0);
       }
@@ -125,6 +135,10 @@ const Render = (() => {
       } else if (a.tipo === 'espelho' && a.eixo && alma) {
         const q = Patterns.espelhar(a.eixo, alma.x, alma.y, { x: 0, y: 0 });
         tracejado(q.x - 6, q.y - 6, 12, 12);
+      } else if (a.tipo === 'modo' && a.modo !== est.modo) {
+        const ic = Sprites.desenho('modo_' + a.modo, final ? PAL.branco : PAL.ouro);
+        ctx.drawImage(ic, -14, Math.round(-bh + 6), 28, 28);
+        tracejado(-18, Math.round(-bh + 2), 36, 36);
       }
     }
   }
@@ -134,6 +148,41 @@ const Render = (() => {
   }
   function setasV(ctx, x, y, dir) {
     for (let k = 0; k < 4; k++) ctx.fillRect(Math.round(x - 3 + k), Math.round(y + dir * k), 7 - k * 2, 1);
+  }
+
+  // Desenho do modo da alma (no espaço da caixa, depois da alma). r = Sim.Corrida.
+  function modoAlma(ctx, r, alma, t) {
+    const m = r.modo, a = r.alma;
+    if (m === 'trilhos') {
+      const ys = r.trilhosY();
+      for (let i = 0; i < ys.length; i++) {
+        ctx.fillStyle = i === a.trilhoAlvo ? PAL.almaClara : PAL.fundo3;
+        for (let x = -r.lim.x - 4; x < r.lim.x + 4; x += 6) ctx.fillRect(Math.round(x), Math.round(ys[i]), 3, 1);
+      }
+    } else if (m === 'escudo') {
+      // arco de ~100° virado pro lado escolhido
+      const S = CONFIG.modos.escudo, ang = [-90, 0, 90, 180][a.escudo | 0] * Math.PI / 180, ab = S.abertura / 2 * Math.PI / 180;
+      ctx.fillStyle = PAL.branco;
+      for (let k = -8; k <= 8; k++) {
+        const q = ang + ab * k / 8;
+        for (const rr of [S.raio, S.raio + 1]) ctx.fillRect(Math.round(alma.x + Math.cos(q) * rr), Math.round(alma.y + Math.sin(q) * rr), 1, 1);
+      }
+      ctx.globalAlpha = 0.25; ctx.fillStyle = PAL.almaClara;
+      for (let k = 0; k < 24; k++) { const q = k * Math.PI / 12; ctx.fillRect(Math.round(alma.x + Math.cos(q) * S.raio), Math.round(alma.y + Math.sin(q) * S.raio), 1, 1); }
+      ctx.globalAlpha = 1;
+    } else if (m === 'gravidade') {
+      // setinha pro lado da gravidade
+      const g = r.est.grav || 1, y = Math.round(alma.y + g * 9);
+      ctx.fillStyle = PAL.almaClara;
+      ctx.fillRect(Math.round(alma.x) - 2, y, 5, 1); ctx.fillRect(Math.round(alma.x) - 1, y + g, 3, 1); ctx.fillRect(Math.round(alma.x), y + 2 * g, 1, 1);
+    } else if (m === 'gelo') {
+      // brilho de gelo piscando em volta
+      ctx.fillStyle = '#c8f4ff';
+      for (let k = 0; k < 3; k++) {
+        const q = t * 2 + k * 2.1;
+        if (Math.sin(t * 9 + k * 2) > 0.2) ctx.fillRect(Math.round(alma.x + Math.cos(q) * 8), Math.round(alma.y + Math.sin(q) * 8), 1, 1);
+      }
+    }
   }
 
   function spriteBala(s, branco) {
@@ -175,7 +224,7 @@ const Render = (() => {
     let destaque = null;
     for (let i = 0; i < at.n; i++) {
       const o = at.vivos[i], s = o.s;
-      if (s.k !== BALA || t < s.t0) continue;
+      if (s.k !== BALA || t < s.t0 || o.morto) continue;
       if (at.destaque === o && op.piscaMorte) { destaque = o; continue; }
       const sp = spritePx(s);
       const x0 = ((o.x - s.r + 0.5) | 0) + hw, y0 = ((o.y - s.r + 0.5) | 0) + hh;
@@ -222,6 +271,14 @@ const Render = (() => {
     const forte = final || pisca;
     const red = op.reduzido;
     switch (s.k) {
+      case PLATAFORMA: {
+        // onde a plataforma vai aparecer: contorno tracejado (não é perigo: cor da alma)
+        if (!forte) break;
+        ctx.fillStyle = PAL.almaClara;
+        const x0 = Math.round(s.x - s.larg / 2), y0 = Math.round(s.y), esp = CONFIG.modos.plataforma.espessura;
+        for (let i = 0; i < s.larg; i += 4) { ctx.fillRect(x0 + i, y0, 2, 1); ctx.fillRect(x0 + i, y0 + esp - 1, 2, 1); }
+        break;
+      }
       case BALA: {
         if (s.av === 'faixa') {
           const d = s.r * 2;
@@ -487,5 +544,5 @@ const Render = (() => {
     ctx.fillRect(sx, sy, 1, 1);
   }
 
-  return { ataques, avisos, hitboxes, escuridao, avisosMods };
+  return { ataques, avisos, hitboxes, escuridao, avisosMods, modoAlma };
 })();

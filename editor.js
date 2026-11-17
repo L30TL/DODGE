@@ -13,7 +13,7 @@
 
 const Editor = (() => {
   const TIPOS = ['chuva', 'fogo', 'laser', 'paredes', 'espiral', 'teleguiada', 'anel', 'moeda',
-    'caixa', 'girar', 'escuro', 'inverter', 'espelho'];
+    'caixa', 'girar', 'escuro', 'inverter', 'espelho', 'modo', 'plataforma'];
   const ehMod = (tipo) => !!Patterns.MODIFICADORES[tipo];
   const arred = (v) => Math.round(v * 1000) / 1000;
   const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
@@ -55,6 +55,11 @@ const Editor = (() => {
       campo('dur', 'num', 0.25, 0), AV()],
     inverter: () => [campo('x', 'bool', 0, false, { rot: 'invX' }), campo('y', 'bool', 0, false, { rot: 'invY' }), AV()],
     espelho: () => [campo('ativo', 'bool', 0, true), campo('eixo', 'enum', 0, 'x', { opcoes: ['x', 'y', 'xy'] }), AV()],
+    // portal: troca o modo da alma (gravidade pra baixo ou pra cima; trilhos com 3 a 5 linhas)
+    modo: (ev) => [campo('modo', 'enum', 0, 'livre', { opcoes: Patterns.MODOS }),
+      ...(ev.modo === 'gravidade' ? [campo('lado', 'enum', 0, 'baixo', { opcoes: ['baixo', 'cima'], rot: 'gravidadePra' })] : []),
+      ...(ev.modo === 'trilhos' ? [campo('linhas', 'int', 1, CONFIG.modos.trilhos.linhas)] : []), AV()],
+    plataforma: () => [...XY(), campo('larg', 'num', 4, 60), campo('dur', 'num', 0.25, 8), AV()],
   };
   const camposDe = (ev) => (CAMPOS[ev.tipo] ? CAMPOS[ev.tipo](ev) : []);
 
@@ -121,6 +126,7 @@ const Editor = (() => {
     anel: { x: 0, y: 0, quantidade: 12 }, moeda: { x: 0.6, y: -0.6, id: 0 },
     caixa: { largura: 0.6, altura: 0.6, dur: 2 }, girar: { angulo: 45, dur: 2 }, escuro: { nivel: 0.9, dur: 1 },
     inverter: { x: true }, espelho: { eixo: 'x' },
+    modo: { modo: 'gravidade' }, plataforma: { x: 0, y: 0.5, larg: 80, dur: 8 },
   };
   function novoEvento(tipo, batida, fase) {
     const ev = Object.assign({ batida: arred(batida), tipo }, JSON.parse(JSON.stringify(NOVOS[tipo] || {})));
@@ -262,8 +268,9 @@ if (typeof UI !== 'undefined') {
 
   // Formata número pro inspetor: 1.5, -0.4, 120.
   const fmt = (v) => (typeof v === 'number' ? String(Math.round(v * 100) / 100) : String(v));
-  const corDoTipo = (tipo) => (tipo === 'moeda' ? PAL.ouro : Editor.ehMod(tipo) ? PAL.roxo : PAL.perigo);
-  const corEscuraDoTipo = (tipo) => (tipo === 'moeda' ? PAL.ouroEscuro : Editor.ehMod(tipo) ? PAL.roxoEscuro : PAL.perigoEscuro);
+  // rosa = perigo; roxo = muda a caixa/a alma; ouro = moeda; azul = plataforma (ajuda)
+  const corDoTipo = (tipo) => (tipo === 'moeda' ? PAL.ouro : tipo === 'plataforma' ? PAL.azul : Editor.ehMod(tipo) ? PAL.roxo : PAL.perigo);
+  const corEscuraDoTipo = (tipo) => (tipo === 'moeda' ? PAL.ouroEscuro : tipo === 'plataforma' ? PAL.azulEscuro : Editor.ehMod(tipo) ? PAL.roxoEscuro : PAL.perigoEscuro);
   const nomeMusica = (id) => t('editor.musicas.' + id);
 
   // Mostra o código de uma fase verificada (ou diz o que falta). aviso(txt) = mensagem rápida da tela.
@@ -510,7 +517,9 @@ if (typeof UI !== 'undefined') {
 
     // Depois de vencer do começo no teste: o solver confere se dá pra passar no teclado.
     function verificar() {
-      ed.verificando = { analise: Solver.Analise(Criadas.jogavel(ed.fase)), hash: Criadas.hashJogo(ed.fase) };
+      // modos com física própria (gravidade, gelo, trilhos, escudo): busca com a física de verdade
+      const jf = Criadas.jogavel(ed.fase);
+      ed.verificando = { analise: Solver.precisaBusca(jf) ? Solver.Busca(jf) : Solver.Analise(jf), hash: Criadas.hashJogo(ed.fase) };
       montar();
     }
     function fimVerificacao() {
@@ -722,7 +731,7 @@ if (typeof UI !== 'undefined') {
           else { hori(l[0] * HH - esp / 2, 0); hori(l[0] * HH + esp / 2, 0); }
           break;
         }
-        case 'espiral': case 'anel': case 'moeda': mira((ev.x || 0) * HW, (ev.y || 0) * HH); break;
+        case 'espiral': case 'anel': case 'moeda': case 'plataforma': mira((ev.x || 0) * HW, (ev.y || 0) * HH); break;
       }
     }
 

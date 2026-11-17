@@ -160,7 +160,41 @@ const Game = (() => {
   const pega = { sessao: -1, ultX: 0, ultY: 0, alvoX: 0, alvoY: 0, reancorar: false };
   const almaEspelho = { x: 0, y: 0 };
   const dirArrasto = { x: 0, y: 0 };
-  const alvoSolver = { x: 0, y: 0 };
+  // controles dos modos da alma (pulo, troca de trilho, lado do escudo)
+  const acoes = { sessaoPulo: -1, sessaoTrilho: -1, ultX: 0, ultY: 0, trilhoTecla: 0, trilhoT: -9, tocando: false, toqueX: 0, toqueY: 0 };
+  const dirTmp = { x: 0, y: 0 };
+
+  function montarAcoes() {
+    const r = J.corrida, m = r.modo, ar = Input.arrasto();
+    entrada.pulo = false; entrada.trilho = 0; entrada.escudo = -1;
+    if (Debug.bot || Debug.caminho) return;
+    if (m === 'gravidade') {
+      // pula: ↑/W/Espaço (segurando, pula de novo ao cair, como no GD) ou cada toque novo na tela
+      entrada.pulo = Input.segurada('ArrowUp') || Input.segurada('KeyW') || Input.segurada('Space') || Input.apertou('ArrowUp', 'KeyW', 'Space');
+      if (ar.sessao !== acoes.sessaoPulo) { acoes.sessaoPulo = ar.sessao; entrada.pulo = true; }   // até toque rapidinho conta
+    } else if (m === 'trilhos') {
+      // teclado: ↑/↓ troca de trilho ao apertar (até toque rapidinho conta); segurando, repete
+      const ax = (Input.apertou('ArrowRight', 'KeyD') ? 1 : 0) - (Input.apertou('ArrowLeft', 'KeyA') ? 1 : 0);
+      const ay = (Input.apertou('ArrowDown', 'KeyS') ? 1 : 0) - (Input.apertou('ArrowUp', 'KeyW') ? 1 : 0);
+      const ap = Sim.telaParaCaixa(r.est, ax, ay, dirTmp);
+      const novo = Math.abs(ap.y) > 0.5 ? Math.sign(ap.y) : 0;
+      const dc = Sim.telaParaCaixa(r.est, entrada.dx, entrada.dy, dirTmp);
+      const v = Math.abs(dc.y) > 0.5 ? Math.sign(dc.y) : 0;
+      if (novo) { entrada.trilho = novo; acoes.trilhoT = tempo; }
+      else if (v && v === acoes.trilhoTecla && tempo - acoes.trilhoT > CONFIG.modos.trilhos.repetirS) { entrada.trilho = v; acoes.trilhoT = tempo; }
+      acoes.trilhoTecla = novo || v;
+      // dedo: arrastar na vertical troca de trilho; na horizontal anda
+      if (ar.ativo) {
+        if (ar.sessao !== acoes.sessaoTrilho) { acoes.sessaoTrilho = ar.sessao; acoes.ultX = ar.totalX; acoes.ultY = ar.totalY; }
+        const dd = Sim.telaParaCaixa(r.est, ar.totalX - acoes.ultX, ar.totalY - acoes.ultY, dirTmp);
+        if (Math.abs(dd.y) > CONFIG.modos.trilhos.arrasteTroca) { entrada.trilho = Math.sign(dd.y); acoes.ultX = ar.totalX; acoes.ultY = ar.totalY; }
+      }
+    } else if (m === 'escudo' && acoes.tocando) {
+      // dedo: o lado da caixa em que ele está (girando junto com a caixa; inversão de controle não vale aqui)
+      const p = Sim.telaParaCaixa({ rad: r.est.rad }, acoes.toqueX - CX, acoes.toqueY - CY, dirTmp);
+      entrada.escudo = Math.abs(p.x) > Math.abs(p.y) ? (p.x > 0 ? 1 : 3) : (p.y > 0 ? 2 : 0);
+    }
+  }
 
   // Estado VISUAL da alma (posição copiada da simulação a cada frame).
   const alma = {
@@ -308,6 +342,8 @@ const Game = (() => {
     J.passouMelhor = false;
     J.raspoes = 0; J.combo = 0; J.ultimoRaspao = -9;
     J.moedasGanhas = 0;
+    const ses = Input.arrasto().sessao;
+    acoes.sessaoPulo = ses; acoes.sessaoTrilho = ses;
     if (contaProgresso()) progresso({ tipo: 'tentativa' });
     J.recorde = false;
     J.textoTentativa = tempo;
@@ -366,11 +402,8 @@ const Game = (() => {
       const d = Debug.bot ? Debug.direcaoBot(J.corrida) : Input.direcao();
       entrada.dx = d.x; entrada.dy = d.y; entrada.local = !!Debug.bot;
       calcularAlvo();
-      if (Debug.caminho && Debug.alvoSolver(t, alvoSolver)) {
-        // assistindo o solver: a alma segue o caminho provado
-        entrada.dx = 0; entrada.dy = 0; entrada.local = true;
-        entrada.temAlvo = true; entrada.alvoX = alvoSolver.x; entrada.alvoY = alvoSolver.y;
-      }
+      montarAcoes();
+      Debug.entradaSolver(t, entrada);         // assistindo o solver (S no debug): ele joga
       J.corrida.invencivel = Debug.invencivel;
       const ox = alma.x, oy = alma.y;
       const evs = J.corrida.passo(t, entrada);
@@ -637,6 +670,8 @@ const Game = (() => {
     sair() { J.controles.limpar(); },
     atualizar(dt) { atualizarJogo(dt); },
     evento(e) {
+      if (e.t === 'down' || e.t === 'move') { if (e.t === 'down' || Input.arrastando()) { acoes.tocando = true; acoes.toqueX = e.x; acoes.toqueY = e.y; } }
+      else if (e.t === 'up' || e.t === 'cancel') acoes.tocando = Input.arrastando();
       if (J.estado === 'jogando') {
         if (e.t === 'tecla' && !e.repetida) {
           if (e.k === 'voltar' || e.k === 'pausa') pausar();
@@ -782,7 +817,14 @@ const Game = (() => {
     let exp = 'normal';
     if (J.estado === 'vitoria') exp = 'feliz';
     else if (alma.susto > 0) exp = 'susto';
-    Avatar.desenhar(c, Avatar.atual(), Math.round(alma.x), Math.round(alma.y), 1, { olharX: alma.olharX, olharY: alma.olharY, expressao: exp });
+    const est = { olharX: alma.olharX, olharY: alma.olharY, expressao: exp };
+    if (J.corrida.modo === 'mini') {
+      // alma encolhida (a hitbox também encolhe, na simulação)
+      c.save(); c.translate(Math.round(alma.x), Math.round(alma.y)); c.scale(CONFIG.modos.mini.escala, CONFIG.modos.mini.escala);
+      Avatar.desenhar(c, Avatar.atual(), 0, 0, 1, est);
+      c.restore();
+    } else Avatar.desenhar(c, Avatar.atual(), Math.round(alma.x), Math.round(alma.y), 1, est);
+    Render.modoAlma(c, J.corrida, alma, J.t);
   }
 
   // Dica sem texto na primeira vez: teclas (PC) ou dedo arrastando (celular).
@@ -985,6 +1027,7 @@ const Game = (() => {
     const dtFx = J.estado === 'morto' && tempo - J.tMorte < CONFIG.morte.congelar ? 0 : dt;
     try {
       tela.atualizar(dt);
+      Input.limparApertos();              // teclas apertadas neste frame já foram lidas
       Particulas.atualizar(dtFx * (nomeTela === 'jogo' ? Debug.vel : 1));
       fx.tremida *= Math.exp(-CONFIG.juice.tremidaDecaimento * dt);
       if (fx.tremida < 0.3) fx.tremida = 0;
