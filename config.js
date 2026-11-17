@@ -9,6 +9,8 @@
 // =============================================================================
 
 const CONFIG = {
+  versao: '0.2.0-dev',     // versão do jogo (aparece na tela inicial e no registro de erros)
+
   // ---------------------------------------------------------------- tela -----
   tela: {
     largura: 480,           // px — resolução lógica (16:9). A arte é feita nessa grade.
@@ -39,9 +41,10 @@ const CONFIG = {
 
   // ------------------------------------------------------- toque (celular) ---
   toque: {
-    sensibilidadePadrao: 1.25, // 1 = a alma anda a mesma distância que o dedo na tela
-    velocidadeMax: 560,     // px/s — limite pra alma não "teleportar" com um puxão rápido
-    bufferMax: 24,          // px — movimento acumulado máximo (evita sensação de atraso)
+    sensibilidadePadrao: 1.25, // DEDO: 1 = a alma anda a mesma distância que o dedo na tela
+    sensibilidadeMouse: 1,  // MOUSE: sempre 1:1 — a bolinha anda exatamente o que o cursor anda
+    velocidadeMax: 1400,    // px/s — limite da alma seguindo o dedo/mouse (a colisão em sub-passos
+                            //        garante que nada atravessa nada mesmo nessa velocidade)
   },
 
   // ------------------------------------------------------------ ataques ------
@@ -56,7 +59,8 @@ const CONFIG = {
     larguraLaser: 12,       // px — espessura padrão do laser
     duracaoLaser: 1,        // batidas que o laser fica ligado, se a fase não disser
     sumicoLaser: 0.12,      // s — animação do laser apagando (já não mata)
-    poolTamanho: 768,       // quantos projéteis podem existir ao mesmo tempo
+    poolMinimo: 64,         // o pool de projéteis se ajusta ao pico de cada fase; este é o mínimo
+    passoGuia: 1 / 240,     // s — passo fixo da curva das teleguiadas (não depende do fps)
   },
 
   // ------------------------------------------------------------- raspão ------
@@ -103,11 +107,43 @@ const CONFIG = {
     calibracaoBpm: 100,     // BPM do teste de calibração
     calibracaoToques: 8,    // toques válidos pra fechar a calibração
     calibracaoCompensacaoMs: 15, // ms — atraso típico do toque/tecla, descontado da calibração
+    paradoMax: 0.3,         // s — se o áudio ficar parado (iPhone interrompeu) mais que isso, o jogo pausa e pede um toque
   },
 
   // ------------------------------------------------------------ progresso ----
   progresso: {
     larguraBarra: 200,      // px — barra de % no topo
+  },
+
+  // --------------------------------------------------------------- save ------
+  save: {
+    gravarDepoisMs: 800,    // ms — mortes comuns gravam juntas depois desse tempo (recorde/vitória gravam na hora)
+    backupS: 120,           // s — de quanto em quanto tempo o backup do save é atualizado
+  },
+
+  // ------------------------------------------------------------- desenho -----
+  render: {
+    balasEmCamada: 120,     // com mais balas que isso na tela, elas são desenhadas numa camada de pixels
+  },
+
+  // ----------------------------------------------------------- simulação -----
+  sim: {
+    passoMax: 0.1,          // s — se um frame travar mais que isso, a simulação avança no máximo isso
+    subpassosMax: 24,       // colisão testada em até tantos pedaços por frame (nada atravessa nada)
+    distSubpasso: 2.5,      // px — um sub-passo a cada tanto de movimento (alma ou projétil mais rápido)
+    dtSubpasso: 1 / 240,    // s — e pelo menos um a cada tanto de tempo (a morte cai no instante certo)
+  },
+
+  // ------------------------------------------------------------- limites -----
+  // Proteção contra fases quebradas ou maliciosas (editor e códigos compartilhados).
+  limites: {
+    maxEventos: 4000,       // eventos numa fase
+    maxPorEvento: 2000,     // projéteis gerados por um único evento
+    maxSpecs: 20000,        // projéteis numa fase inteira
+    maxPosicoes: 64,        // itens numa lista de posições
+    maxTexto: 40,           // caracteres em nome/autor
+    bpmMin: 40, bpmMax: 300,
+    batidasMin: 4, batidasMax: 2000,
   },
 
   // --------------------------------------------------------------- textos ----

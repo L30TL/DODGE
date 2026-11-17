@@ -4,7 +4,7 @@ Jogo arcade 2D de navegador: uma alma presa numa caixa desvia de ataques que cae
 
 ## Fase atual
 - **Fase 1** (núcleo): completa e no ar em https://l30tl.github.io/DODGE/ (GitHub Pages, branch `main`).
-- **OVERHAUL** (veja `DESIGN.md › OVERHAUL`): **Etapa 0 (auditoria) concluída em 17/11/2026 — aguardando o ok do usuário** pra começar a Sessão 1. Bugs da auditoria em `BUGS.md`.
+- **OVERHAUL** (veja `DESIGN.md › OVERHAUL`): Etapa 0 (auditoria) concluída e aprovada. **Sessão 1 (fundação) concluída em 17/11/2026** (versão 0.2.0-dev): simulação pura, render separado, save v2, captura de erros, validador, 24 testes, bugs B01–B17, B19, B20 corrigidos (B18 fica pra Etapa 5). **Próxima: Sessão 2 (editor).** Histórico em `CHANGELOG.md`, bugs em `BUGS.md`.
 
 ## Plano do overhaul por sessão
 Ordem combinada: o que falta do roadmap original entra antes das etapas novas; a fundação da Etapa 1 vem primeiro porque o editor, o solver e os testes dependem dela.
@@ -32,18 +32,23 @@ HTML5 Canvas + JavaScript puro, sem frameworks e sem build. Scripts clássicos c
 
 | Arquivo | Global | Papel |
 |---|---|---|
-| `config.js` | `CONFIG` | Todos os números de ajuste, comentados |
-| `save.js` | `Save` | Save no localStorage com try/catch (`dodge.save.v1`) |
+| `erros.js` | `Erros` | Captura global de erros (carrega primeiro): aviso discreto + registro copiável |
+| `config.js` | `CONFIG` | Todos os números de ajuste, comentados (inclui `limites`, `sim`, `render`, `save`) |
+| `save.js` | `Save` | Save v2 (`dodge.save`): migrações, backup, recuperação de corrompido, mescla entre abas, regras de progresso (`registrarMorte`, `registrarVitoria`) |
 | `ui.js` | `TEXTOS`, `t()`, `PAL`, `Fonte`, `Sprites`, `UI`, `Controles` | Textos, paleta, fonte pixel própria, ícones, botões/sliders e telas de menu (título, fases, config, calibração) |
 | `audio.js` | `Sound` | Sequenciador chiptune (pulso 25%/12,5%, triangular, ruído, bumbo), músicas, efeitos, relógio do jogo |
 | `avatar.js` | `Avatar` | A alma como dado (camadas `{ peca, cor, posicao }`) |
-| `input.js` | `Input` | Teclado (setas/WASD) e arrasto relativo em qualquer lugar da tela |
-| `patterns.js` | `Patterns` | Os 7 padrões de ataque → specs analíticas; pool, colisão (SDF), desenho |
+| `input.js` | `Input` | Teclado (setas/WASD) e arrasto em qualquer lugar da tela (mouse 1:1, dedo com sensibilidade, ancorado no toque) |
+| `patterns.js` | `Patterns` | PURO: validador de fases, os 7 padrões → specs analíticas, pool do tamanho do pico, colisão (SDF) |
+| `sim.js` | `Sim` | PURO: `Sim.Corrida` = uma tentativa (movimento, sub-passos, raspão, moedas, morte, vitória). Jogo, bots e testes usam a mesma |
+| `render.js` | `Render` | Desenho dos ataques (avisos, balas — em camada de pixels quando são muitas —, lasers, paredes, moedas, hitboxes) |
 | `levels.js` | `Levels` | Fases como dados `{ id, nome, autor, dificuldade, musica, bpm, duracaoBatidas, eventos }` |
-| `game.js` | `Game` | Loop, navegação entre telas, tela de jogo (alma, raspão, morte, restart, vitória, pausa, juice) |
+| `game.js` | `Game` | Loop, navegação, tela de jogo: lê o tempo do áudio, passa a entrada pra `Sim.Corrida` e transforma os eventos em som/partículas/save |
 | `debug.js` | `Debug` | Painel `?debug=1`, bot, analisador de alcançabilidade, mapa de mortes |
 | `editor.js`, `profile.js` | — | Stubs (Fases 2–4) |
 | `tools/verificar-fases.js` | — | CLI Node: prova que as fases são vencíveis + bots |
+| `tests/*.test.js` | — | Testes `node --test` (padrões, simulação, save, textos); `tests/carregar.js` carrega os scripts no Node |
+| `tools/navegador/*.js` | — | Testes no navegador (Playwright): regressão dos bugs, mouse, estresse, erros |
 
 ## Como rodar
 ```bash
@@ -52,10 +57,12 @@ python3 -m http.server 8000
 Abrir http://localhost:8000. Debug: http://localhost:8000/?debug=1
 (teclas no debug: H hitbox, I invencível, L câmera lenta, B bot, K morrer, 0–9 pula pra 0–90%, [ ] ±5%)
 
-Verificar fases (precisa de Node):
+Testes (precisa de Node; nenhuma biblioteca):
 ```bash
-node tools/verificar-fases.js            # todas
+node --test                              # 24 testes, ~30 s
+node tools/verificar-fases.js            # prova que as fases são vencíveis + bots
 DETALHE=1 node tools/verificar-fases.js prensa
+node tools/navegador/regressao.js        # com o servidor ligado; precisa do Playwright
 ```
 
 ## Regras de trabalho
@@ -69,4 +76,6 @@ DETALHE=1 node tools/verificar-fases.js prensa
 - Commit a cada parte que funciona; push no fim de cada sessão.
 - Atualizar `DESIGN.md` (seção Decisões) e este arquivo quando algo mudar.
 - O tempo do jogo vem de `Sound.posicao()` (relógio do áudio), nunca de frames.
+- Lógica de jogo nova vai pro lado PURO (`patterns.js`/`sim.js`/`save.js`) com teste; desenho vai pro `render.js`/`game.js`.
+- Mudou o formato do save? Suba `Save.VERSAO` e escreva a migração em `MIGRACOES` (com teste).
 - Nenhum número mágico de jogabilidade fora do `config.js`. Todo texto visível em `TEXTOS`.

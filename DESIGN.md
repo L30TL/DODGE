@@ -250,3 +250,9 @@ _(registro de decisões tomadas durante o desenvolvimento; a mais recente embaix
 - 2026-11-17 — **Pausa** para a música; ao continuar há contagem 3-2-1 e a música volta exatamente da posição pausada.
 - 2026-11-17 — Além das 3 músicas das fases, há uma **música de menu** curta em loop.
 - 2026-11-17 — **Verificação de fases** (`node tools/verificar-fases.js`): prova por alcançabilidade que a fase é vencível e roda bots com tempo de reação de 150/250/350 ms como termômetro de dificuldade. Modo debug usa `?debug=1`; usar debug (pular, invencível, bot) não conta recorde nem vitória.
+- 2026-11-17 — **Overhaul aprovado** (prompt salvo acima). Ordem: fundação da Etapa 1 → o que falta das Fases 2 e 3 → resto da Etapa 1 → Etapas 2 a 6. Plano por sessão no `CLAUDE.md`.
+- 2026-11-17 — **Save v2** na chave `dodge.save` (o `dodge.save.v1` da Fase 1 não é apagado: vira backup). Backup em `dodge.save.backup`; save corrompido é guardado em `dodge.save.corrompido.*`. Toda mudança de formato tem migração versionada.
+- 2026-11-17 — **Mouse 1:1**: arrastar com o mouse move a alma exatamente o que o cursor anda (o dedo continua com a sensibilidade das configurações, padrão 1,25). O arrasto é ancorado no toque/clique; a alma segue o ponto a até 1400 px/s.
+- 2026-11-17 — **Limites de fase** (`CONFIG.limites`): até 4000 eventos, 64 posições por lista, 2000 projéteis por evento e 20000 por fase. Toda fase passa pelo validador (oficial, editor ou código compartilhado).
+- 2026-11-17 — Debug (pular %, invencível, bot) não conta recorde, vitória **nem entra no mapa de mortes**.
+- 2026-11-17 — **Falar sempre em português** com o usuário.

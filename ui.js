@@ -49,6 +49,18 @@ const TEXTOS = {
     ganhouEstrelas: '+{n}',
     maisFasesEmBreve: 'MAIS FASES EM BREVE!',
     girarCelular: 'GIRE O CELULAR',
+    jogar: 'JOGAR',
+    versao: 'V{n}',
+    rotuloDebug: 'DEBUG',
+    saveIndisponivel: 'SAVE INDISPONÍVEL NESTE NAVEGADOR',
+    saveRecuperado: 'SEU SAVE TINHA UM PROBLEMA E FOI RECUPERADO DO BACKUP',
+    savePerdido: 'O SAVE ESTAVA ESTRAGADO; UMA CÓPIA FOI GUARDADA',
+    audioInterrompido: 'O SOM PAROU. TOQUE EM CONTINUAR',
+    erroAviso: 'ERRO REGISTRADO · VEJA EM CONFIGURAÇÕES',
+    registroErros: 'REGISTRO DE ERROS ({n})',
+    copiar: 'COPIAR',
+    copiado: 'COPIADO!',
+    limpar: 'LIMPAR',
     salvar: 'SALVAR',
     calibracaoTitulo: 'CALIBRAR ÁUDIO',
     calibracaoInstrucao: 'TOQUE OU APERTE ESPAÇO JUNTO COM A BATIDA',
@@ -745,7 +757,7 @@ UI.telas.titulo = (() => {
         const txt = Input.temToque() ? t('toquePraComecar') : t('cliquePraComecar');
         UI.texto(c, txt, 240, 196, { escala: 2, alinhar: 'centro', cor: PAL.branco, sombra: PAL.preto });
       }
-      UI.texto(c, 'V0.1', 474, 260, { alinhar: 'direita', cor: PAL.cinza });
+      UI.texto(c, t('versao', { n: CONFIG.versao.toUpperCase() }), 474, 260, { alinhar: 'direita', cor: PAL.cinza });
     },
   };
 })();
@@ -778,7 +790,7 @@ UI.telas.fases = (() => {
     C.botao({ x: 456, y: 6, w: 18, h: 16, icone: Sprites.desenho('engrenagem', PAL.branco), acao: () => Game.irPara('config', { voltar: 'fases' }) });
     C.botao({ x: 52, y: CART.y + CART.h / 2 - 20, w: 26, h: 40, icone: Sprites.desenho('setaEsq', PAL.branco), acao: () => mudar(-1) });
     C.botao({ x: 402, y: CART.y + CART.h / 2 - 20, w: 26, h: 40, icone: Sprites.desenho('setaDir', PAL.branco), acao: () => mudar(1) });
-    const pri = C.botao({ x: 180, y: 216, w: 120, h: 22, texto: 'JOGAR', escala: 2, primario: true, cor: PAL.alma, acao: jogar });
+    const pri = C.botao({ x: 180, y: 216, w: 120, h: 22, texto: t('jogar'), escala: 2, primario: true, cor: PAL.alma, acao: jogar });
     C.focar(pri);
   }
 
@@ -810,7 +822,7 @@ UI.telas.fases = (() => {
     // moedas secretas
     for (let i = 0; i < 3; i++) UI.sprite(c, Sprites.moeda(reg.moedas[i]), bx + i * 18, y + 122, 2);
     UI.texto(c, t('tentativas', { n: reg.tentativas }), x + CART.w - 16, y + 126, { alinhar: 'direita', cor: PAL.cinzaClaro });
-    if (f.debug) UI.texto(c, 'DEBUG', x + CART.w - 16, y + 146, { alinhar: 'direita', cor: PAL.perigo });
+    if (f.debug) UI.texto(c, t('rotuloDebug'), x + CART.w - 16, y + 146, { alinhar: 'direita', cor: PAL.perigo });
     c.globalAlpha = 1;
   }
 
@@ -890,7 +902,21 @@ UI.telas.fases = (() => {
 UI.telas.config = (() => {
   const C = new Controles();
   let voltarPara = 'fases';
-  let confirmando = false, msg = null, msgT = 0;
+  let confirmando = false, msg = null, msgT = 0, copiadoT = -9;
+
+  // Copia o registro de erros (pra colar numa mensagem). Funciona mesmo sem a API nova.
+  function copiarErros() {
+    const txt = Erros.texto();
+    const fallback = () => {
+      try {
+        const ta = document.createElement('textarea');
+        ta.value = txt; ta.style.position = 'fixed'; ta.style.opacity = '0';
+        document.body.appendChild(ta); ta.select(); document.execCommand('copy'); ta.remove();
+      } catch (e) { /* ok */ }
+    };
+    try { navigator.clipboard.writeText(txt).catch(fallback); } catch (e) { fallback(); }
+    copiadoT = Game.tempo;
+  }
   const cfg = () => Save.config;
   const salvar = () => { Sound.volumes(); Save.gravarDepois(); };
 
@@ -936,6 +962,9 @@ UI.telas.config = (() => {
         Sound.volumes();
         msg = t('progressoApagado'); msgT = Game.tempo;
       } });
+    y += 22;
+    C.botao({ x: x + rot, y: y - 2, w: 60, h: 14, texto: () => (copiadoT > Game.tempo - 1.5 ? t('copiado') : t('copiar')), acao: copiarErros });
+    C.botao({ x: x + rot + 66, y: y - 2, w: 50, h: 14, texto: t('limpar'), acao: () => Erros.limpar() });
     const voltar = C.botao({ x: 180, y: 238, w: 120, h: 18, texto: '← ' + t('voltar'), primario: true, cor: PAL.alma, acao: sair });
     C.focar(voltar);
     C.focar(C.itens[0]);
@@ -973,10 +1002,11 @@ UI.telas.config = (() => {
       y += 26;
       UI.texto(c, t('reduzirEfeitos'), x, y + 1, { cor: PAL.branco }); y += 22;
       UI.texto(c, t('pausaAuto'), x, y + 1, { cor: PAL.branco }); y += 22;
-      UI.texto(c, t('apagarProgresso'), x, y + 1, { cor: PAL.perigoClaro });
+      UI.texto(c, t('apagarProgresso'), x, y + 1, { cor: PAL.perigoClaro }); y += 22;
+      UI.texto(c, t('registroErros', { n: Erros.lista.length }), x, y + 1, { cor: Erros.lista.length ? PAL.ouro : PAL.cinzaClaro });
       C.desenhar(c, tm);
-      if (msg && tm - msgT < 2) UI.texto(c, msg, 240, 222, { alinhar: 'centro', cor: PAL.ouro });
-      if (!Save.disponivel) UI.texto(c, 'SAVE INDISPONÍVEL NESTE NAVEGADOR', 240, 260, { alinhar: 'centro', cor: PAL.perigo });
+      if (msg && tm - msgT < 2) UI.texto(c, msg, 240, 226, { alinhar: 'centro', cor: PAL.ouro });
+      if (!Save.disponivel) UI.texto(c, t('saveIndisponivel'), 240, 260, { alinhar: 'centro', cor: PAL.perigo });
     },
   };
 })();
@@ -1012,7 +1042,7 @@ UI.telas.calibrar = (() => {
     toques.push(off);
     if (toques.length >= CONFIG.audio.calibracaoToques + 2) {
       const validos = toques.slice(2);                // os 2 primeiros são aquecimento
-      resultado = Math.round(mediana(validos) * 1000 - CONFIG.audio.calibracaoCompensacaoMs);
+      resultado = Math.max(-100, Math.min(600, Math.round(mediana(validos) * 1000 - CONFIG.audio.calibracaoCompensacaoMs)));
       montar();
     }
   }

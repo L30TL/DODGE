@@ -1,0 +1,9 @@
+{
+  "name": "dodge",
+  "private": true,
+  "description": "Dodge — desvie no ritmo. Jogo de navegador em HTML5 Canvas + JavaScript puro.",
+  "scripts": {
+    "test": "node --test",
+    "verificar": "node tools/verificar-fases.js"
+  }
+}

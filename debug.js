@@ -39,7 +39,7 @@ const Debug = (() => {
       ];
       if (Game.nomeTela === 'jogo' && J.fase) {
         linhas.push(`t ${J.t.toFixed(2)}s · batida ${J.batida.toFixed(1)} · ${(J.prog * 100).toFixed(1)}%`);
-        linhas.push(`projéteis ${J.ataques.n}/${CONFIG.ataques.poolTamanho} (estouros ${J.ataques.estourou}) · partículas ${Game.Particulas.ativas()}`);
+        linhas.push(`projéteis ${J.ataques.n}/${J.ataques.pool.length} (estouros ${J.ataques.estourou}) · partículas ${Game.Particulas.ativas()}`);
       }
       linhas.push(`áudio: atrasadas ${Sound.stats.atrasadas} · sfx ${Sound.stats.sfxAtivos} · latência ${(Sound.latencia() * 1000).toFixed(0)} ms`);
       if (ultimoErro) linhas.push('ERRO: ' + ultimoErro);
@@ -75,37 +75,26 @@ const Debug = (() => {
     // ------------------------------------------------------------ BOT ------
     // Piloto automático: testa 9 direções olhando ~0,6 s pra frente e escolhe a
     // mais segura. Só enxerga o que já está na tela (avisos), como um jogador.
-    direcaoBot(alma, J) {
-      const lim = { x: Game.HW - CONFIG.alma.margemParede, y: Game.HH - CONFIG.alma.margemParede };
-      return bot(alma, J.ataques, J.t, lim, 0);
+    direcaoBot(corrida) {
+      return bot(corrida.alma, corrida.at, corrida.t, corrida.lim, 0);
     },
 
     // Joga a fase sem tela, com um "tempo de reação" (s): o bot só enxerga avisos
-    // que apareceram há pelo menos `atraso` segundos. Bom termômetro de dificuldade.
+    // que apareceram há pelo menos `atraso` segundos. Usa a MESMA simulação do jogo.
     simularBot(fase, atraso) {
       const comp = Patterns.compilar(fase, CONFIG.caixa);
-      const at = new Patterns.Ataques(comp);
-      const lim = { x: comp.hw - CONFIG.alma.margemParede, y: comp.hh - CONFIG.alma.margemParede };
-      const alma = { x: 0, y: 0 };
-      const dt = 1 / 60, v = CONFIG.alma.velocidade;
-      const lixo = [], moedas = [];
-      let raspoes = 0;
-      for (let tt = 0; tt < comp.duracao; tt += dt) {
-        const d = bot(alma, at, tt, lim, atraso);
-        const ox = alma.x, oy = alma.y;
-        alma.x = Math.max(-lim.x, Math.min(lim.x, alma.x + d.x * v * dt));
-        alma.y = Math.max(-lim.y, Math.min(lim.y, alma.y + d.y * v * dt));
-        at.atualizar(tt + dt, dt, alma);
-        for (let k = 1; k <= 3; k++) {
-          const f = k / 3;
-          lixo.length = 0;
-          const m = at.testar(tt + dt * f, ox + (alma.x - ox) * f, oy + (alma.y - oy) * f,
-            CONFIG.alma.raioHitbox, CONFIG.alma.raioRaspao, lixo, moedas);
-          raspoes += lixo.length;
-          if (m) return { venceu: false, t: tt, pct: Math.floor(tt / comp.duracao * 100), batida: tt / comp.B, raspoes, ev: fase.eventos[m.s.ev], x: alma.x, y: alma.y };
-        }
+      const r = new Sim.Corrida(comp);
+      const ent = { dx: 0, dy: 0, ax: 0, ay: 0 };
+      const dt = 1 / 60;
+      for (let tt = dt; r.estado === 'jogando' && tt < comp.duracao + 1; tt += dt) {
+        const d = bot(r.alma, r.at, r.t, r.lim, atraso);
+        ent.dx = d.x; ent.dy = d.y;
+        r.passo(tt, ent);
       }
-      return { venceu: true, pct: 100, raspoes, moedas: moedas.length };
+      if (r.estado !== 'morto') return { venceu: true, pct: 100, raspoes: r.raspoes, moedas: r.moedas.filter(Boolean).length };
+      const m = r.morte;
+      return { venceu: false, t: m.t, pct: m.pct, batida: m.t / comp.B, raspoes: r.raspoes,
+        ev: m.o && m.o.s && comp.fase.eventos[m.o.s.ev], x: m.x, y: m.y };
     },
 
     // ------------------------------------------------------- ANALISADOR ----

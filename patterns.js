@@ -23,11 +23,112 @@
 const Patterns = (() => {
   // tipos de spec (números são mais rápidos que strings no loop)
   const BALA = 1, LASER = 2, PAREDE = 3, MURO = 4, ORBE = 5, EMISSOR = 6, MOEDA = 7;
-  const FORA = 24; // px — o quanto as paredes passam da borda da caixa
+
+  // ======================================================== VALIDAÇÃO ======
+  // Toda fase passa por aqui antes de compilar (oficial, do editor ou de código
+  // compartilhado). Nunca lança erro: corrige o que dá, descarta o resto e
+  // devolve avisos. Garante que nada vira NaN e que nenhuma fase trava o jogo.
+  const NUM = (min, max) => ({ t: 'num', min, max });
+  const INT = (min, max) => ({ t: 'int', min, max });
+  const POS = { t: 'pos' };
+  const LADOS = ['cima', 'baixo', 'esquerda', 'direita'];
+  const COMUNS = { aviso: NUM(0, 16), intervalo: NUM(0, 16), vel: NUM(10, 600), tam: NUM(2, 40) };
+  const ESQUEMA = {
+    chuva: { pos: POS, de: LADOS },
+    fogo: { pos: POS, eixo: ['h', 'v'], alternar: 'bool' },
+    laser: { pos: POS, orient: 'orient', larg: NUM(2, 120), dur: NUM(0.05, 64), ate: POS },
+    paredes: { modo: ['buraco'], eixo: ['h', 'v'], de: LADOS, centro: POS, espaco: NUM(8, 400), fechar: NUM(0.05, 16),
+      segurar: NUM(0, 64), abrir: NUM(0.05, 16), larg: NUM(2, 80) },
+    espiral: { x: NUM(-1, 1), y: NUM(-1, 1), bracos: INT(1, 16), giro: NUM(-1440, 1440), dur: NUM(0.25, 64),
+      cadencia: NUM(0.25, 16), ang: NUM(-3600, 3600) },
+    teleguiada: { de: LADOS, pos: POS, quantidade: INT(1, 64), guia: NUM(0, 1440), guiaDur: NUM(0, 16) },
+    anel: { x: NUM(-1, 1), y: NUM(-1, 1), quantidade: INT(1, 128), giro: NUM(-3600, 3600), raio: NUM(2, 120) },
+    moeda: { x: NUM(-1, 1), y: NUM(-1, 1), dur: NUM(0.25, 64), id: INT(0, 2) },
+  };
+  const DIFICULDADES = ['facil', 'normal', 'dificil', 'dificilimo', 'insano', 'demonio'];
+  const ehNum = (v) => typeof v === 'number' && Number.isFinite(v);
+
+  function limparParam(regra, v) {
+    if (Array.isArray(regra)) return regra.includes(v) ? v : undefined;
+    if (regra === 'bool') return typeof v === 'boolean' ? v : undefined;
+    if (regra === 'orient') return v === 'v' || v === 'h' ? v : ehNum(v) ? clamp(v, -360, 360) : undefined;
+    if (regra.t === 'num') return ehNum(v) ? clamp(v, regra.min, regra.max) : undefined;
+    if (regra.t === 'int') return ehNum(v) ? clamp(Math.round(v), regra.min, regra.max) : undefined;
+    if (regra.t === 'pos') {
+      if (ehNum(v)) return clamp(v, -1, 1);
+      if (!Array.isArray(v)) return undefined;
+      const l = v.filter(ehNum).slice(0, CONFIG.limites.maxPosicoes).map(x => clamp(x, -1, 1));
+      return l.length ? l : undefined;
+    }
+    return undefined;
+  }
+
+  // Quantos projéteis um evento (já limpo) vai gerar.
+  function contarSpecs(ev) {
+    const n = (v) => (Array.isArray(v) ? v.length : 1);
+    switch (ev.tipo) {
+      case 'chuva': case 'laser': return n(ev.pos);
+      case 'fogo': return n(ev.pos) * (ev.alternar === false ? 2 : 1);
+      case 'paredes': return ev.modo === 'buraco' ? n(ev.centro) : 2;
+      case 'espiral': return 1 + Math.max(1, Math.round((ev.dur !== undefined ? ev.dur : 4) * (ev.cadencia || 2))) * (ev.bracos || 3);
+      case 'teleguiada': return ev.quantidade || 3;
+      case 'anel': return 1 + (ev.quantidade || 12);
+      default: return 1;
+    }
+  }
+
+  function validar(fase) {
+    const avisos = [];
+    const L = CONFIG.limites;
+    if (!fase || typeof fase !== 'object') { fase = {}; avisos.push('fase inválida'); }
+    const txt = (v, def) => (typeof v === 'string' ? v.slice(0, L.maxTexto) : def);
+    const out = {
+      id: txt(fase.id, 'sem-id'),
+      nome: txt(fase.nome, 'Sem nome'),
+      autor: txt(fase.autor, '?'),
+      dificuldade: DIFICULDADES.includes(fase.dificuldade) ? fase.dificuldade : 'normal',
+      musica: txt(fase.musica, ''),
+      bpm: ehNum(fase.bpm) ? clamp(fase.bpm, L.bpmMin, L.bpmMax) : 120,
+      duracaoBatidas: ehNum(fase.duracaoBatidas) ? clamp(fase.duracaoBatidas, L.batidasMin, L.batidasMax) : 64,
+      eventos: [],
+    };
+    if (fase.debug === true) out.debug = true;
+    if (out.bpm !== fase.bpm) avisos.push('bpm corrigido para ' + out.bpm);
+    if (out.duracaoBatidas !== fase.duracaoBatidas) avisos.push('duração corrigida para ' + out.duracaoBatidas);
+    const evs = Array.isArray(fase.eventos) ? fase.eventos : [];
+    if (evs.length > L.maxEventos) avisos.push(`eventos demais (${evs.length}); ficam os ${L.maxEventos} primeiros`);
+    let total = 0;
+    for (let i = 0; i < evs.length && i < L.maxEventos; i++) {
+      const ev = evs[i];
+      if (!ev || typeof ev !== 'object' || !ESQUEMA[ev.tipo]) { avisos.push(`evento ${i}: tipo desconhecido`); continue; }
+      if (!ehNum(ev.batida) || ev.batida < 0 || ev.batida > out.duracaoBatidas + 64) { avisos.push(`evento ${i}: batida inválida`); continue; }
+      const limpo = { batida: ev.batida, tipo: ev.tipo };
+      const regras = Object.assign({}, COMUNS, ESQUEMA[ev.tipo]);
+      for (const k in regras) {
+        if (ev[k] === undefined) continue;
+        const v = limparParam(regras[k], ev[k]);
+        if (v === undefined) avisos.push(`evento ${i}: "${k}" inválido, usando o padrão`);
+        else limpo[k] = v;
+      }
+      // espiral muito longa: encurta pra caber no limite por evento
+      if (limpo.tipo === 'espiral') {
+        const porTiro = limpo.bracos || 3, cad = limpo.cadencia || 2;
+        const maxDur = Math.floor((L.maxPorEvento - 1) / porTiro) / cad;
+        if ((limpo.dur !== undefined ? limpo.dur : 4) > maxDur) { limpo.dur = maxDur; avisos.push(`evento ${i}: espiral encurtada`); }
+      }
+      const n = contarSpecs(limpo);
+      if (n > L.maxPorEvento) { avisos.push(`evento ${i}: projéteis demais (${n})`); continue; }
+      if (total + n > L.maxSpecs) { avisos.push(`fase passou de ${L.maxSpecs} projéteis; o resto foi ignorado`); break; }
+      total += n;
+      out.eventos.push(limpo);
+    }
+    return { fase: out, avisos };
+  }
 
   // ======================================================== COMPILAÇÃO =====
-  // fase -> { specs[], duracao, B (s por batida), velMax }
-  function compilar(fase, caixa) {
+  // fase -> { specs[], duracao, B (s por batida), velMax, maxVivos, fase (validada), avisos }
+  function compilar(faseBruta, caixa) {
+    const { fase, avisos } = validar(faseBruta);
     const B = 60 / fase.bpm;
     const hw = caixa.largura / 2, hh = caixa.altura / 2;
     const demonio = fase.dificuldade === 'demonio';
@@ -60,7 +161,17 @@ const Patterns = (() => {
     let velMax = 0;
     for (const s of specs) if (s.k === BALA) velMax = Math.max(velMax, Math.hypot(s.vx, s.vy), s.vel || 0);
     for (const s of specs) if (s.k === MURO) velMax = Math.max(velMax, s.vel);
-    return { specs, duracao: fase.duracaoBatidas * B, B, hw, hh, velMax, fase };
+    return { specs, duracao: fase.duracaoBatidas * B, B, hw, hh, velMax, maxVivos: maxSimultaneos(specs), fase, avisos };
+  }
+
+  // Maior número de specs vivas ao mesmo tempo (dimensiona o pool: nada é descartado).
+  function maxSimultaneos(specs) {
+    const marcas = [];
+    for (const s of specs) { marcas.push([s.tA, 1]); marcas.push([Math.max(s.tA, s.tF), -1]); }
+    marcas.sort((a, b) => a[0] - b[0] || a[1] - b[1]);
+    let n = 0, max = 0;
+    for (const m of marcas) { n += m[1]; if (n > max) max = n; }
+    return max;
   }
 
   // ---------------------------------------------------------- helpers ------
@@ -268,14 +379,15 @@ const Patterns = (() => {
   // ============================================================ MOTOR ======
   // Um "vivo" é um projétil em jogo (vem do pool, não aloca durante a fase).
   function novoVivo() {
-    return { s: null, x: 0, y: 0, vx: 0, vy: 0, ax: 0, ay: 0, p: 0, e: 0, m: 0,
+    return { s: null, x: 0, y: 0, vx: 0, vy: 0, ax: 0, ay: 0, ix: 0, iy: 0, ti: 0, p: 0, e: 0, m: 0,
       ativo: false, raspou: false, somFeito: false, morto: false, pego: false };
   }
 
   class Ataques {
     constructor(comp) {
       this.c = comp;
-      const n = CONFIG.ataques.poolTamanho;
+      // o pool tem o tamanho exato do pico da fase (+ folga): nenhum ataque é descartado
+      const n = Math.max(CONFIG.ataques.poolMinimo, (comp.maxVivos || 0) + 8);
       this.pool = new Array(n);
       this.livres = new Array(n);
       for (let i = 0; i < n; i++) { this.pool[i] = novoVivo(); this.livres[i] = this.pool[i]; }
@@ -285,7 +397,7 @@ const Patterns = (() => {
       this.prox = 0;
       this.destaque = null;   // o que matou a alma (pisca na morte)
       this.aoEvento = null;   // callback(tipo, vivo) para sons/tremida
-      this.estourou = 0;      // quantas vezes o pool acabou (debug)
+      this.estourou = 0;      // quantas vezes o pool acabou (não deve acontecer)
     }
 
     // Limpa e avança até o tempo t (restart = t 0; debug pode pular pra qualquer t).
@@ -307,6 +419,8 @@ const Patterns = (() => {
       o.s = s; o.ativo = false; o.raspou = false; o.morto = false; o.pego = false;
       o.somFeito = pulando && s.tSom !== undefined && t > s.tSom + 0.05;
       o.x = s.x || 0; o.y = s.y || 0; o.vx = s.vx || 0; o.vy = s.vy || 0; o.ax = o.x; o.ay = o.y;
+      o.ix = o.x; o.iy = o.y; o.ti = s.t0;
+      o.p = 0; o.e = 0; o.m = 0;          // nada do projétil anterior que usou este objeto
       this.vivos[this.n++] = o;
       if (t >= s.t0) this.ativar(o, t, alma);
       return o;
@@ -320,31 +434,35 @@ const Patterns = (() => {
         const d = Math.hypot(dx, dy) || 1;
         o.vx = dx / d * s.vel; o.vy = dy / d * s.vel;
         o.ax = s.x; o.ay = s.y;
+        o.ix = s.x; o.iy = s.y; o.ti = s.t0;
       }
     }
 
-    // Avança tudo pro tempo t. dt = passo desde o último frame (para curvas teleguiadas).
+    // Avança tudo pro tempo t. dt = passo desde o último frame.
     atualizar(t, dt, alma) {
+      if (!Number.isFinite(t)) return;
+      // 1) libera o que já acabou (antes de nascer o novo: o pool tem o tamanho exato do pico)
+      for (let i = this.n - 1; i >= 0; i--) {
+        const o = this.vivos[i];
+        if (t >= o.s.tF || o.morto || o.pego) { this.liberar(o); this.vivos[i] = this.vivos[--this.n]; }
+      }
+      // 2) nasce o que começa agora
       const specs = this.c.specs;
       while (this.prox < specs.length && specs[this.prox].tA <= t) {
         const s = specs[this.prox++];
         if (t < s.tF) this.nascer(s, t, alma, false);
       }
+      // 3) ativa, toca o som e posiciona
       const hw = this.c.hw, hh = this.c.hh;
       for (let i = this.n - 1; i >= 0; i--) {
         const o = this.vivos[i];
         const s = o.s;
-        if (t >= s.tF || o.morto || o.pego) {
-          this.liberar(o);
-          this.vivos[i] = this.vivos[--this.n];
-          continue;
-        }
         if (!o.ativo && t >= s.t0) this.ativar(o, t, alma);
         if (!o.somFeito && s.tSom !== undefined && t >= s.tSom) {
           o.somFeito = true;
           if (this.aoEvento) this.aoEvento('ativou', o);
         }
-        this.posicionar(o, t, dt, alma);
+        this.posicionar(o, t, alma);
         if (s.k === BALA && s.mira && o.ativo) {
           const m = s.r + 4;
           if (o.x < -hw - m || o.x > hw + m || o.y < -hh - m || o.y > hh + m) {
@@ -355,25 +473,35 @@ const Patterns = (() => {
       }
     }
 
+    // Curva teleguiada em PASSO FIXO (independe do fps): integra de o.ti até t.
+    guiar(o, t, alma) {
+      const s = o.s, h = CONFIG.ataques.passoGuia;
+      let guarda = 0;
+      while (o.ti + h <= t && guarda++ < 4800) {
+        if (o.ti - s.t0 < s.guiaDur && alma) {
+          const alvo = Math.atan2(alma.y - o.iy, alma.x - o.ix);
+          let a = Math.atan2(o.vy, o.vx);
+          let d = alvo - a;
+          while (d > Math.PI) d -= Math.PI * 2;
+          while (d < -Math.PI) d += Math.PI * 2;
+          const max = s.guia * Math.PI / 180 * h;
+          a += clamp(d, -max, max);
+          o.vx = Math.cos(a) * s.vel; o.vy = Math.sin(a) * s.vel;
+        }
+        o.ix += o.vx * h; o.iy += o.vy * h; o.ti += h;
+      }
+    }
+
     // Calcula a geometria do vivo no tempo t (guarda em o.x/o.y/o.p/o.e/o.m).
-    posicionar(o, t, dt, alma) {
+    posicionar(o, t, alma) {
       const s = o.s;
       switch (s.k) {
         case BALA:
           if (!o.ativo) { o.x = s.x; o.y = s.y; break; }
           if (s.mira) {
-            if (s.guia > 0 && t - s.t0 < s.guiaDur && alma && dt > 0) {
-              // curva em direção à alma, limitada a `guia` graus/s
-              const alvo = Math.atan2(alma.y - o.y, alma.x - o.x);
-              let a = Math.atan2(o.vy, o.vx);
-              let d = alvo - a;
-              while (d > Math.PI) d -= Math.PI * 2;
-              while (d < -Math.PI) d += Math.PI * 2;
-              const max = s.guia * Math.PI / 180 * dt;
-              a += clamp(d, -max, max);
-              o.vx = Math.cos(a) * s.vel; o.vy = Math.sin(a) * s.vel;
-              o.x += o.vx * dt; o.y += o.vy * dt;
-              o.ax = o.x - o.vx * (t - s.t0); o.ay = o.y - o.vy * (t - s.t0);
+            if (s.guia > 0) {
+              this.guiar(o, t, alma);
+              o.x = o.ix + o.vx * (t - o.ti); o.y = o.iy + o.vy * (t - o.ti);
             } else {
               o.x = o.ax + o.vx * (t - s.t0); o.y = o.ay + o.vy * (t - s.t0);
             }
@@ -396,19 +524,47 @@ const Patterns = (() => {
     // Testa colisão da alma (px, py) no tempo t. Raspões e moedas vão pras listas.
     // Retorna o vivo que matou, ou null.
     testar(t, px, py, rHit, rRaspao, raspoes, moedas) {
+      const raioMoeda = CONFIG.moedas.raioColeta;
       for (let i = 0; i < this.n; i++) {
         const o = this.vivos[i];
         const s = o.s;
         if (s.k === MOEDA) {
-          if (!o.pego && t >= s.t0 && Math.hypot(px - s.x, py - s.y) < CONFIG.moedas.raioColeta) { o.pego = true; moedas.push(s); }
+          if (!o.pego && t >= s.t0) {
+            const dx = px - s.x, dy = py - s.y;
+            if (dx * dx + dy * dy < raioMoeda * raioMoeda) { o.pego = true; moedas.push(s); }
+          }
           continue;
         }
-        const d = this.distancia(o, t, px, py);
-        if (d === Infinity) continue;
+        let d;
+        if (s.k === BALA) {
+          // caminho rápido: descarta balas longe sem raiz quadrada (milhares por frame)
+          if (t < s.t0) continue;
+          const lim = s.hr + rRaspao;
+          const dx = px - this.xBala(o, t);
+          if (dx > lim || dx < -lim) continue;
+          const dy = py - this.yBala(o, t);
+          if (dy > lim || dy < -lim) continue;
+          d = Math.sqrt(dx * dx + dy * dy) - s.hr;
+        } else {
+          d = this.distancia(o, t, px, py);
+          if (d === Infinity) continue;
+        }
         if (d < rHit) return o;
         if (d < rRaspao && !o.raspou) { o.raspou = true; raspoes.push(o); }
       }
       return null;
+    }
+
+    // Posição de uma bala no tempo t (analítica; a teleguiada extrapola do último passo fixo).
+    xBala(o, t) {
+      const s = o.s;
+      if (!s.mira) return s.x + s.vx * (t - s.t0);
+      return s.guia > 0 ? o.ix + o.vx * (t - o.ti) : o.ax + o.vx * (t - s.t0);
+    }
+    yBala(o, t) {
+      const s = o.s;
+      if (!s.mira) return s.y + s.vy * (t - s.t0);
+      return s.guia > 0 ? o.iy + o.vy * (t - o.ti) : o.ay + o.vy * (t - s.t0);
     }
 
     // Distância (com sinal) da alma até a parte letal do vivo no tempo t. Infinity = inofensivo agora.
@@ -417,10 +573,7 @@ const Patterns = (() => {
       switch (s.k) {
         case BALA: {
           if (t < s.t0) return Infinity;
-          let x, y;
-          if (s.mira) { x = o.ax + o.vx * (t - s.t0); y = o.ay + o.vy * (t - s.t0); if (s.guia > 0) { x = o.x; y = o.y; } }
-          else { x = s.x + s.vx * (t - s.t0); y = s.y + s.vy * (t - s.t0); }
-          return Math.hypot(px - x, py - y) - s.hr;
+          return Math.hypot(px - this.xBala(o, t), py - this.yBala(o, t)) - s.hr;
         }
         case LASER: {
           if (t < s.t0 || t >= s.t1) return Infinity;
@@ -448,65 +601,6 @@ const Patterns = (() => {
         default: return Infinity;
       }
     }
-
-    // ------------------------------------------------------------ DESENHO --
-    // ctx já está transladado pro centro da caixa e com clip na caixa.
-    desenhar(ctx, t, batida, op) {
-      const hw = this.c.hw, hh = this.c.hh, B = this.c.B;
-      const pisca = ((batida * CONFIG.ataques.piscadasPorBatida) % 1) < 0.5;
-      // 1) avisos
-      for (let i = 0; i < this.n; i++) {
-        const o = this.vivos[i];
-        if (t < o.s.t0 || o.s.k === EMISSOR || o.s.k === ORBE) desenharAviso(ctx, o, t, hw, hh, B, pisca, op);
-      }
-      // 2) paredes e muros
-      for (let i = 0; i < this.n; i++) {
-        const o = this.vivos[i], k = o.s.k;
-        if ((k === PAREDE || k === MURO) && t >= o.s.t0) desenharParede(ctx, o, t, hw, hh, this.destaque === o, op);
-      }
-      // 3) lasers
-      for (let i = 0; i < this.n; i++) {
-        const o = this.vivos[i];
-        if (o.s.k === LASER && t >= o.s.t0) desenharLaser(ctx, o, t, hw, hh, this.destaque === o, op);
-      }
-      // 4) balas
-      for (let i = 0; i < this.n; i++) {
-        const o = this.vivos[i];
-        if (o.s.k !== BALA || t < o.s.t0) continue;
-        const d = o.s.r * 2;
-        const destaque = this.destaque === o;
-        const spr = destaque && op.piscaMorte
-          ? Sprites.bala(d, PAL.branco, PAL.branco, PAL.perigoClaro)
-          : Sprites.bala(d, PAL.perigo, PAL.perigoClaro, PAL.perigoEscuro);
-        ctx.drawImage(spr, Math.round(o.x - o.s.r), Math.round(o.y - o.s.r));
-      }
-      // 5) moedas
-      for (let i = 0; i < this.n; i++) {
-        const o = this.vivos[i];
-        if (o.s.k !== MOEDA || o.pego) continue;
-        desenharMoeda(ctx, o, t, batida);
-      }
-      if (op.hitbox) this.desenharHitboxes(ctx, t, hw, hh);
-    }
-
-    desenharHitboxes(ctx, t, hw, hh) {
-      ctx.strokeStyle = '#00ff66';
-      ctx.lineWidth = 1;
-      for (let i = 0; i < this.n; i++) {
-        const o = this.vivos[i], s = o.s;
-        if (s.k === BALA && t >= s.t0) {
-          ctx.beginPath(); ctx.arc(o.x, o.y, s.hr, 0, Math.PI * 2); ctx.stroke();
-        } else if (s.k === LASER && t >= s.t0 && t < s.t1) {
-          if (s.eixoAlinhado && s.ang === -90) ctx.strokeRect(o.p - s.hr, -hh, s.hr * 2, hh * 2);
-          else if (s.eixoAlinhado) ctx.strokeRect(-hw, o.p - s.hr, hw * 2, s.hr * 2);
-          else { ctx.save(); ctx.rotate(s.ang * Math.PI / 180); ctx.strokeRect(-400, o.p - s.hr, 800, s.hr * 2); ctx.restore(); }
-        } else if (s.k === PAREDE && t >= s.t0) {
-          const e = o.e + (s.lado < 0 ? -1 : 1) * CONFIG.ataques.folgaHitbox;
-          if (s.eixo === 'h') ctx.strokeRect(s.lado < 0 ? -hw : e, -hh, s.lado < 0 ? e + hw : hw - e, hh * 2);
-          else ctx.strokeRect(-hw, s.lado < 0 ? -hh : e, hw * 2, s.lado < 0 ? e + hh : hh - e);
-        }
-      }
-    }
   }
 
   // Distância com sinal a um retângulo, dadas as distâncias por eixo (negativo = dentro).
@@ -524,278 +618,5 @@ const Patterns = (() => {
     return s.recolhida;
   }
 
-  // ------------------------------------------------------------ avisos -----
-  function desenharAviso(ctx, o, t, hw, hh, B, pisca, op) {
-    const s = o.s;
-    const prog = clamp((t - s.tA) / Math.max(0.001, s.t0 - s.tA), 0, 1);  // 0 → 1 até ativar
-    const final = prog > 0.75;
-    const forte = final || pisca;
-    const red = op.reduzido;
-    switch (s.k) {
-      case BALA: {
-        if (s.av === 'faixa') {
-          const d = s.r * 2;
-          ctx.globalAlpha = (forte ? 0.32 : 0.16) * (0.6 + 0.4 * prog);
-          ctx.fillStyle = PAL.perigo;
-          if (s.vy !== 0) ctx.fillRect(Math.round(s.x - s.r), -hh, d, hh * 2);
-          else ctx.fillRect(-hw, Math.round(s.y - s.r), hw * 2, d);
-          ctx.globalAlpha = 1;
-          // seta na borda de entrada
-          if (forte) desenharSeta(ctx, s, hw, hh, final ? PAL.branco : PAL.perigo);
-        } else if (s.av === 'mira' && op.alma) {
-          // linha de mira até a alma
-          ctx.globalAlpha = forte ? 0.55 : 0.25;
-          ctx.fillStyle = final ? PAL.branco : PAL.perigo;
-          const dx = op.alma.x - s.x, dy = op.alma.y - s.y;
-          const len = Math.hypot(dx, dy) || 1;
-          for (let k = 0; k < len; k += 4) ctx.fillRect(Math.round(s.x + dx * k / len), Math.round(s.y + dy * k / len), 1, 1);
-          ctx.globalAlpha = 1;
-          const spr = Sprites.bala(s.r * 2, PAL.perigoEscuro, PAL.perigo, PAL.perigoEscuro);
-          const sx = clamp(s.x, -hw + s.r, hw - s.r), sy = clamp(s.y, -hh + s.r, hh - s.r);
-          if (forte) ctx.drawImage(spr, Math.round(sx - s.r), Math.round(sy - s.r));
-        }
-        break;
-      }
-      case LASER: {
-        // faixa fraca com a largura real + linha central piscando
-        ctx.save();
-        if (!s.eixoAlinhado) ctx.rotate((s.ang) * Math.PI / 180);
-        const vertical = s.eixoAlinhado && s.ang === -90;
-        const w = s.w;
-        const draw = (p, a) => {
-          ctx.globalAlpha = a;
-          if (!s.eixoAlinhado) ctx.fillRect(-400, Math.round(p - w / 2), 800, w);
-          else if (vertical) ctx.fillRect(Math.round(p - w / 2), -hh, w, hh * 2);
-          else ctx.fillRect(-hw, Math.round(p - w / 2), hw * 2, w);
-        };
-        ctx.fillStyle = PAL.perigo;
-        if (s.p1 !== s.p0) {
-          // laser que varre: mostra a área toda que ele vai percorrer
-          const a = Math.min(s.p0, s.p1) - w / 2, b = Math.max(s.p0, s.p1) + w / 2;
-          ctx.globalAlpha = 0.07;
-          if (!s.eixoAlinhado) ctx.fillRect(-400, Math.round(a), 800, Math.round(b - a));
-          else if (vertical) ctx.fillRect(Math.round(a), -hh, Math.round(b - a), hh * 2);
-          else ctx.fillRect(-hw, Math.round(a), hw * 2, Math.round(b - a));
-        }
-        draw(s.p0, (forte ? 0.3 : 0.15) * (0.5 + 0.5 * prog));
-        ctx.globalAlpha = 1;
-        ctx.fillStyle = final ? PAL.branco : (pisca ? PAL.perigoClaro : PAL.perigo);
-        if (forte || prog > 0.5) {
-          if (!s.eixoAlinhado) ctx.fillRect(-400, Math.round(s.p0), 800, 1);
-          else if (vertical) ctx.fillRect(Math.round(s.p0), -hh, 1, hh * 2);
-          else ctx.fillRect(-hw, Math.round(s.p0), hw * 2, 1);
-        }
-        if (s.p1 !== s.p0 && forte && s.eixoAlinhado) {
-          // setas indicando a direção da varredura
-          const dir = Math.sign(s.p1 - s.p0);
-          ctx.fillStyle = PAL.branco;
-          for (const ao of [-0.5, 0, 0.5]) {
-            const c = Math.round(ao * (vertical ? hh : hw));
-            for (let k = 0; k < 3; k++) {
-              const h = 1 + 2 * (2 - k);
-              const q = Math.round(s.p0 + dir * (s.w / 2 + 2 + k));
-              if (vertical) ctx.fillRect(q, c - (2 - k), 1, h);
-              else ctx.fillRect(c - (2 - k), q, h, 1);
-            }
-          }
-        }
-        ctx.restore();
-        break;
-      }
-      case PAREDE: {
-        // área que vai ser ocupada + linha onde a parede para
-        const e = s.fechada;
-        ctx.globalAlpha = (forte ? 0.16 : 0.08);
-        ctx.fillStyle = PAL.perigo;
-        if (s.eixo === 'h') {
-          if (s.lado < 0) ctx.fillRect(-hw, -hh, Math.round(e + hw), hh * 2);
-          else ctx.fillRect(Math.round(e), -hh, Math.round(hw - e), hh * 2);
-        } else {
-          if (s.lado < 0) ctx.fillRect(-hw, -hh, hw * 2, Math.round(e + hh));
-          else ctx.fillRect(-hw, Math.round(e), hw * 2, Math.round(hh - e));
-        }
-        ctx.globalAlpha = 1;
-        if (forte) {
-          ctx.fillStyle = final ? PAL.branco : PAL.perigo;
-          const x = Math.round(e) - (s.lado > 0 ? 0 : 1);
-          if (s.eixo === 'h') for (let y = -hh; y < hh; y += 4) ctx.fillRect(x, y, 1, 2);
-          else for (let xx = -hw; xx < hw; xx += 4) ctx.fillRect(xx, x, 2, 1);
-        }
-        break;
-      }
-      case MURO: {
-        // muro "fantasma" na borda de entrada, com o vão marcado
-        ctx.globalAlpha = forte ? 0.3 : 0.14;
-        ctx.fillStyle = PAL.perigo;
-        const L = s.larg;
-        const borda = -s.dir * (s.horiz ? hw : hh);
-        const a0 = s.dir > 0 ? borda : borda - L;
-        const g0 = s.g - s.esp / 2, g1 = s.g + s.esp / 2;
-        if (s.horiz) {
-          ctx.fillRect(Math.round(a0), -hh, L, Math.round(g0 + hh));
-          ctx.fillRect(Math.round(a0), Math.round(g1), L, Math.round(hh - g1));
-        } else {
-          ctx.fillRect(-hw, Math.round(a0), Math.round(g0 + hw), L);
-          ctx.fillRect(Math.round(g1), Math.round(a0), Math.round(hw - g1), L);
-        }
-        ctx.globalAlpha = 1;
-        if (forte) {
-          // colchetes brancos marcando o vão
-          ctx.fillStyle = final ? PAL.branco : PAL.perigoClaro;
-          if (s.horiz) { ctx.fillRect(Math.round(a0), Math.round(g0) - 1, L, 1); ctx.fillRect(Math.round(a0), Math.round(g1), L, 1); }
-          else { ctx.fillRect(Math.round(g0) - 1, Math.round(a0), 1, L); ctx.fillRect(Math.round(g1), Math.round(a0), 1, L); }
-        }
-        break;
-      }
-      case ORBE: {
-        if (t >= s.t0) break;
-        const r = Math.max(2, s.raio * (1 - prog * 0.85));
-        ctx.fillStyle = forte ? PAL.perigoClaro : PAL.perigo;
-        anelPixel(ctx, s.x, s.y, r);
-        // raios mostrando para onde as balas vão
-        ctx.globalAlpha = forte ? 0.4 : 0.18;
-        ctx.fillStyle = PAL.perigo;
-        for (let i = 0; i < s.n; i++) {
-          const a = s.giro + i * Math.PI * 2 / s.n;
-          for (let k = r + 3; k < r + 22; k += 3) ctx.fillRect(Math.round(s.x + Math.cos(a) * k), Math.round(s.y + Math.sin(a) * k), 1, 1);
-        }
-        ctx.globalAlpha = 1;
-        const nucleo = final ? 4 : 3;
-        ctx.fillStyle = final ? PAL.branco : PAL.perigo;
-        ctx.fillRect(Math.round(s.x - nucleo / 2), Math.round(s.y - nucleo / 2), nucleo, nucleo);
-        break;
-      }
-      case EMISSOR: {
-        const girando = t >= s.t0;
-        const giro = girando ? s.giro * (Math.min(t, s.t1) - s.t0) / s.B : 0;
-        ctx.fillStyle = girando ? PAL.perigoClaro : (forte ? PAL.perigoClaro : PAL.perigo);
-        for (let a = 0; a < s.bracos; a++) {
-          const ang = (s.ang0 + a * 360 / s.bracos + giro) * Math.PI / 180;
-          const len = girando ? 8 : 5 + prog * 10;
-          for (let k = 3; k < len; k += 2) ctx.fillRect(Math.round(s.x + Math.cos(ang) * k), Math.round(s.y + Math.sin(ang) * k), 1, 1);
-        }
-        ctx.fillStyle = forte || girando ? PAL.branco : PAL.perigo;
-        ctx.fillRect(Math.round(s.x) - 2, Math.round(s.y) - 2, 4, 4);
-        if (!red && girando) { ctx.fillStyle = PAL.perigo; anelPixel(ctx, s.x, s.y, 5 + (pisca ? 1 : 0)); }
-        break;
-      }
-    }
-  }
-
-  function desenharSeta(ctx, s, hw, hh, cor) {
-    ctx.fillStyle = cor;
-    const x = Math.round(s.x), y = Math.round(s.y);
-    if (s.de === 'cima') { const yy = -hh + 1; ctx.fillRect(x - 3, yy, 7, 1); ctx.fillRect(x - 2, yy + 1, 5, 1); ctx.fillRect(x - 1, yy + 2, 3, 1); ctx.fillRect(x, yy + 3, 1, 1); }
-    else if (s.de === 'baixo') { const yy = hh - 2; ctx.fillRect(x - 3, yy, 7, 1); ctx.fillRect(x - 2, yy - 1, 5, 1); ctx.fillRect(x - 1, yy - 2, 3, 1); ctx.fillRect(x, yy - 3, 1, 1); }
-    else if (s.de === 'esquerda') { const xx = -hw + 1; ctx.fillRect(xx, y - 3, 1, 7); ctx.fillRect(xx + 1, y - 2, 1, 5); ctx.fillRect(xx + 2, y - 1, 1, 3); ctx.fillRect(xx + 3, y, 1, 1); }
-    else if (s.de === 'direita') { const xx = hw - 2; ctx.fillRect(xx, y - 3, 1, 7); ctx.fillRect(xx - 1, y - 2, 1, 5); ctx.fillRect(xx - 2, y - 1, 1, 3); ctx.fillRect(xx - 3, y, 1, 1); }
-  }
-
-  function anelPixel(ctx, cx, cy, r) {
-    const n = Math.max(12, Math.round(r * 5));
-    for (let i = 0; i < n; i++) {
-      const a = i / n * Math.PI * 2;
-      ctx.fillRect(Math.round(cx + Math.cos(a) * r), Math.round(cy + Math.sin(a) * r), 1, 1);
-    }
-  }
-
-  // ------------------------------------------------------- lasers/paredes --
-  function desenharLaser(ctx, o, t, hw, hh, destaque, op) {
-    const s = o.s;
-    let w = s.w;
-    let alpha = 1;
-    if (t >= s.t1) { const u = (t - s.t1) / CONFIG.ataques.sumicoLaser; w = s.w * (1 - u); alpha = 1 - u; }
-    else if (t - s.t0 < 0.05) w = s.w + 4;            // estalo ao ligar
-    if (w < 1) return;
-    const vertical = s.eixoAlinhado && s.ang === -90;
-    const flick = op.frame % 2 === 0;
-    ctx.save();
-    if (!s.eixoAlinhado) ctx.rotate(s.ang * Math.PI / 180);
-    ctx.globalAlpha = alpha;
-    const faixa = (p, larg, cor) => {
-      ctx.fillStyle = cor;
-      const a = Math.round(p - larg / 2), l = Math.max(1, Math.round(larg));
-      if (!s.eixoAlinhado) ctx.fillRect(-400, a, 800, l);
-      else if (vertical) ctx.fillRect(a, -hh, l, hh * 2);
-      else ctx.fillRect(-hw, a, hw * 2, l);
-    };
-    const p = o.p;
-    if (destaque && op.piscaMorte) faixa(p, w, PAL.branco);
-    else {
-      faixa(p, w, PAL.perigoEscuro);
-      faixa(p, w - 2, PAL.perigo);
-      faixa(p, Math.max(1, w * 0.4), flick ? PAL.perigoClaro : PAL.branco);
-    }
-    ctx.restore();
-  }
-
-  function desenharParede(ctx, o, t, hw, hh, destaque, op) {
-    const s = o.s;
-    const pad = padraoListras(ctx);
-    ctx.fillStyle = destaque && op.piscaMorte ? PAL.branco : pad;
-    if (s.k === PAREDE) {
-      const e = Math.round(o.e);
-      let x, y, w, h;
-      if (s.eixo === 'h') {
-        if (s.lado < 0) { x = -hw - 2; w = e - x; } else { x = e; w = hw + 2 - e; }
-        y = -hh - 2; h = hh * 2 + 4;
-      } else {
-        if (s.lado < 0) { y = -hh - 2; h = e - y; } else { y = e; h = hh + 2 - e; }
-        x = -hw - 2; w = hw * 2 + 4;
-      }
-      if (w <= 0 || h <= 0) return;
-      ctx.fillRect(x, y, w, h);
-      // borda interna brilhante
-      ctx.fillStyle = destaque && op.piscaMorte ? PAL.branco : PAL.perigoClaro;
-      if (s.eixo === 'h') ctx.fillRect(s.lado < 0 ? e - 2 : e, y, 2, h);
-      else ctx.fillRect(x, s.lado < 0 ? e - 2 : e, w, 2);
-    } else {
-      const m = o.m, L = s.larg;
-      const g0 = Math.round(s.g - s.esp / 2), g1 = Math.round(s.g + s.esp / 2);
-      const a = Math.round(m - L / 2);
-      if (s.horiz) {
-        ctx.fillRect(a, -hh - 2, L, g0 + hh + 2);
-        ctx.fillRect(a, g1, L, hh + 2 - g1);
-        ctx.fillStyle = PAL.perigoClaro;
-        ctx.fillRect(a, g0 - 1, L, 1); ctx.fillRect(a, g1, L, 1);
-      } else {
-        ctx.fillRect(-hw - 2, a, g0 + hw + 2, L);
-        ctx.fillRect(g1, a, hw + 2 - g1, L);
-        ctx.fillStyle = PAL.perigoClaro;
-        ctx.fillRect(g0 - 1, a, 1, L); ctx.fillRect(g1, a, 1, L);
-      }
-    }
-  }
-
-  let padrao = null;
-  function padraoListras(ctx) {
-    if (padrao) return padrao;
-    const cv = document.createElement('canvas');
-    cv.width = 8; cv.height = 8;
-    const c = cv.getContext('2d');
-    c.fillStyle = PAL.perigoEscuro; c.fillRect(0, 0, 8, 8);
-    c.fillStyle = PAL.perigo;
-    for (let i = 0; i < 8; i++) { c.fillRect(i, (i + 0) % 8, 1, 1); c.fillRect(i, (i + 1) % 8, 1, 1); c.fillRect(i, (i + 2) % 8, 1, 1); }
-    padrao = ctx.createPattern(cv, 'repeat');
-    return padrao;
-  }
-
-  function desenharMoeda(ctx, o, t, batida) {
-    const s = o.s;
-    const bob = Math.round(Math.sin(batida * Math.PI) * 1.5);
-    const spr = Sprites.moeda(true);
-    // brilho em volta
-    ctx.globalAlpha = 0.25 + 0.15 * Math.sin(t * 8);
-    ctx.fillStyle = PAL.ouro;
-    ctx.fillRect(Math.round(s.x) - 5, Math.round(s.y) - 5 + bob, 11, 11);
-    ctx.globalAlpha = 1;
-    ctx.drawImage(spr, Math.round(s.x) - 3, Math.round(s.y) - 3 + bob);
-    // faísca
-    const f = Math.floor(t * 6) % 4;
-    ctx.fillStyle = PAL.branco;
-    const sx = Math.round(s.x) + [4, -5, 3, -4][f], sy = Math.round(s.y) + [-5, -3, 4, 3][f] + bob;
-    ctx.fillRect(sx, sy, 1, 1);
-  }
-
-  return { compilar, Ataques, GERADORES, TIPOS: { BALA, LASER, PAREDE, MURO, ORBE, EMISSOR, MOEDA }, bordaParede };
+  return { compilar, validar, Ataques, GERADORES, ESQUEMA, TIPOS: { BALA, LASER, PAREDE, MURO, ORBE, EMISSOR, MOEDA }, bordaParede };
 })();

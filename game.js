@@ -138,7 +138,6 @@ const Game = (() => {
     tentativa: 0,
     melhorAntes: 0, passouMelhor: false,
     raspoes: 0, combo: 0, ultimoRaspao: -9,
-    moedas: [false, false, false],
     trapaca: false,          // usou debug (pulo/invencível): não conta recorde
     tMorte: 0, pctMorte: 0, recorde: false,
     textoMorte: null,        // { pct, recorde, ini }
@@ -146,28 +145,34 @@ const Game = (() => {
     tVitoria: 0, ganhouEstrelas: 0,
     pausaPos: 0, contagemIni: 0, contagemTicks: 0,
     dica: { ativa: false, movido: 0 },
+    corrida: null,           // Sim.Corrida da fase atual (a lógica pura)
+    audioParado: 0, avisoAudio: false, recomecarAoContinuar: false,
     controles: new Controles(),
   };
+  const entrada = { dx: 0, dy: 0, temAlvo: false, alvoX: 0, alvoY: 0 };
+  // Arrasto ancorado: no começo do toque/clique, guarda onde a alma estava; a alma vai pra
+  // âncora + o quanto o dedo/mouse andou. Mouse é sempre 1:1; dedo usa a sensibilidade.
+  const pega = { sessao: -1, ancX: 0, ancY: 0, reancorar: false };
 
+  // Estado VISUAL da alma (posição copiada da simulação a cada frame).
   const alma = {
     x: 0, y: 0, vx: 0, vy: 0, olharX: 0, olharY: 0, susto: 0,
-    pend: { x: 0, y: 0 },
     rastro: [], rastroI: 0,
   };
   for (let i = 0; i < CONFIG.alma.rastro; i++) alma.rastro.push({ x: 0, y: 0 });
 
-  const raspoesFrame = [], moedasFrame = [];
   const cacheComp = {};
 
   function preparar(fase) {
     J.fase = fase;
-    if (!cacheComp[fase.id]) {
+    if (!cacheComp[fase.id] || cacheComp[fase.id].fase !== fase) {
       const comp = Patterns.compilar(fase, CONFIG.caixa);
-      cacheComp[fase.id] = { comp, ataques: new Patterns.Ataques(comp) };
+      cacheComp[fase.id] = { fase, comp, corrida: new Sim.Corrida(comp) };
     }
     J.comp = cacheComp[fase.id].comp;
-    J.ataques = cacheComp[fase.id].ataques;
-    J.ataques.aoEvento = aoEventoAtaque;
+    J.corrida = cacheComp[fase.id].corrida;
+    J.ataques = J.corrida.at;
+    J.recomecarAoContinuar = false; J.avisoAudio = false; J.audioParado = 0;
     J.musica = Sound.info(fase.musica);
     J.cor = COR_DIFICULDADE[fase.dificuldade] || PAL.alma;
     J.temMoedas = J.comp.specs.some(s => s.k === Patterns.TIPOS.MOEDA);
@@ -179,8 +184,7 @@ const Game = (() => {
     J.dica.movido = 0;
   }
 
-  function aoEventoAtaque(tipo, o) {
-    if (J.estado !== 'jogando') return;
+  function aoEventoAtaque(o) {
     const s = o.s;
     if (s.som) Sound.sfx(s.som);
     if (s.tremida) tremer(s.tremida);
@@ -200,88 +204,80 @@ const Game = (() => {
     J.melhorAntes = reg.melhor;
     J.passouMelhor = false;
     J.raspoes = 0; J.combo = 0; J.ultimoRaspao = -9;
-    J.moedas[0] = J.moedas[1] = J.moedas[2] = false;
     J.recorde = false;
     J.textoTentativa = tempo;
-    alma.x = 0; alma.y = 0; alma.vx = 0; alma.vy = 0; alma.pend.x = 0; alma.pend.y = 0; alma.susto = 0;
+    alma.x = 0; alma.y = 0; alma.vx = 0; alma.vy = 0; alma.susto = 0;
     for (const r of alma.rastro) { r.x = 0; r.y = 0; }
-    Input.descartarArrasto();
-    const t0 = desdeT || 0;
-    J.ataques.reiniciar(t0, alma);
-    Sound.tocar(J.fase.musica, { desde: t0, vel: Debug.vel });
-    J.t = t0;
-    J.batida = t0 / J.comp.B;
+    pega.reancorar = true;
+    J.corrida.reiniciar(desdeT || 0);
+    J.t = J.corrida.t;
+    J.prog = J.corrida.prog;
+    Sound.tocar(J.fase.musica, { desde: J.t, vel: Debug.vel });
+    J.batida = J.t / J.comp.B;
     J.estado = 'jogando';
+    J.audioParado = 0;
     Flutuantes.limpar();
-    if (J.pausarAoVoltar) { J.pausarAoVoltar = false; pausar(); }
   }
 
-  function moverAlma(dt) {
-    const d = Debug.bot ? Debug.direcaoBot(alma, J) : Input.direcao();
-    const v = CONFIG.alma.velocidade;
-    let mx = d.x * v * dt, my = d.y * v * dt;
-    // toque: movimento relativo do dedo
-    const a = Input.consumirArrasto();
-    const sens = Save.config.sensibilidadeToque || CONFIG.toque.sensibilidadePadrao;
-    alma.pend.x += a.dx * sens; alma.pend.y += a.dy * sens;
-    const pl = Math.hypot(alma.pend.x, alma.pend.y);
-    if (pl > CONFIG.toque.bufferMax) { alma.pend.x *= CONFIG.toque.bufferMax / pl; alma.pend.y *= CONFIG.toque.bufferMax / pl; }
-    const maxPasso = CONFIG.toque.velocidadeMax * dt;
-    const pl2 = Math.hypot(alma.pend.x, alma.pend.y);
-    if (pl2 > 0) {
-      const k = Math.min(1, maxPasso / pl2);
-      mx += alma.pend.x * k; my += alma.pend.y * k;
-      alma.pend.x -= alma.pend.x * k; alma.pend.y -= alma.pend.y * k;
+  // Onde o dedo/mouse está "segurando" a alma agora (px da caixa).
+  function calcularAlvo() {
+    const ar = Input.arrasto();
+    entrada.temAlvo = false;
+    if (!ar.ativo || Debug.bot) { pega.sessao = -1; pega.reancorar = false; return; }
+    const sens = ar.tipo === 'mouse' ? CONFIG.toque.sensibilidadeMouse
+      : (Save.config.sensibilidadeToque || CONFIG.toque.sensibilidadePadrao);
+    if (ar.sessao !== pega.sessao) {
+      // começou a arrastar: a âncora é onde a alma estava no clique (o que o cursor já andou conta)
+      pega.sessao = ar.sessao;
+      pega.ancX = alma.x; pega.ancY = alma.y;
+    } else if (pega.reancorar) {
+      // a alma voltou pro centro com o dedo ainda na tela (nova tentativa): ancora de novo daqui
+      pega.ancX = alma.x - ar.totalX * sens; pega.ancY = alma.y - ar.totalY * sens;
     }
-    const limX = HW - CONFIG.alma.margemParede, limY = HH - CONFIG.alma.margemParede;
-    let nx = alma.x + mx, ny = alma.y + my;
-    if (nx < -limX) { nx = -limX; alma.pend.x = Math.max(0, alma.pend.x); }
-    if (nx > limX) { nx = limX; alma.pend.x = Math.min(0, alma.pend.x); }
-    if (ny < -limY) { ny = -limY; alma.pend.y = Math.max(0, alma.pend.y); }
-    if (ny > limY) { ny = limY; alma.pend.y = Math.min(0, alma.pend.y); }
-    if (dt > 0) { alma.vx = (nx - alma.x) / dt; alma.vy = (ny - alma.y) / dt; }
-    const movido = Math.hypot(nx - alma.x, ny - alma.y);
-    J.dica.movido += movido;
-    const ox = alma.x, oy = alma.y;
-    alma.x = nx; alma.y = ny;
-    // olhos seguem o movimento
-    alma.olharX = alma.vx > 25 ? 1 : alma.vx < -25 ? -1 : 0;
-    alma.olharY = alma.vy > 25 ? 1 : alma.vy < -25 ? -1 : 0;
-    return { ox, oy };
+    pega.reancorar = false;
+    let ax = pega.ancX + ar.totalX * sens, ay = pega.ancY + ar.totalY * sens;
+    // passou da parede: a âncora acompanha, então voltar o dedo move a alma na hora
+    const L = J.corrida.lim;
+    if (ax > L.x) { pega.ancX -= ax - L.x; ax = L.x; } else if (ax < -L.x) { pega.ancX -= ax + L.x; ax = -L.x; }
+    if (ay > L.y) { pega.ancY -= ay - L.y; ay = L.y; } else if (ay < -L.y) { pega.ancY -= ay + L.y; ay = -L.y; }
+    entrada.temAlvo = true; entrada.alvoX = ax; entrada.alvoY = ay;
   }
 
   function atualizarJogo(dt) {
     if (J.estado === 'jogando') {
+      // áudio parado (iPhone interrompeu, navegador bloqueou): pausa e pede um toque (B02)
+      if (Sound.pronto() && !Sound.rodando()) {
+        J.audioParado += dt;
+        if (J.audioParado > CONFIG.audio.paradoMax) { J.avisoAudio = true; pausar(); return; }
+      } else J.audioParado = 0;
       let t = Sound.posicao();
-      if (!Sound.pronto()) t = J.t + dt;          // sem áudio: relógio de reserva
+      if (!Sound.pronto()) t = J.t + dt;          // sem áudio nenhum: relógio de reserva
       if (t < J.t) t = J.t;                       // nunca volta no tempo
-      let dts = t - J.t;
-      if (dts > 0.1) dts = 0.1;
-      const tIni = t - dts;
-      const { ox, oy } = moverAlma(dts);
-      J.ataques.atualizar(t, dts, alma);
-      // colisão em sub-passos (nada atravessa nada, mesmo com frame lento)
-      const dist = Math.hypot(alma.x - ox, alma.y - oy);
-      const passos = Math.max(1, Math.min(12, Math.ceil(Math.max(dist, J.comp.velMax * dts) / 2.5)));
-      raspoesFrame.length = 0; moedasFrame.length = 0;
-      let matou = null, mx = alma.x, my = alma.y, mt = t;
-      for (let k = 1; k <= passos && !matou; k++) {
-        const f = k / passos;
-        const ts = tIni + dts * f;
-        const px = ox + (alma.x - ox) * f, py = oy + (alma.y - oy) * f;
-        const m = J.ataques.testar(ts, px, py, CONFIG.alma.raioHitbox, CONFIG.alma.raioRaspao, raspoesFrame, moedasFrame);
-        if (m && !Debug.invencivel) { matou = m; mx = px; my = py; mt = ts; }
-      }
-      for (const s of moedasFrame) pegarMoeda(s);
-      if (!matou) for (let i = 0; i < raspoesFrame.length; i++) raspar(raspoesFrame[i]);
-      J.t = t;
-      J.batida = t / J.comp.B;
-      J.prog = Math.max(0, Math.min(1, t / J.comp.duracao));
-      // rastro
+      const d = Debug.bot ? Debug.direcaoBot(J.corrida) : Input.direcao();
+      entrada.dx = d.x; entrada.dy = d.y;
+      calcularAlvo();
+      J.corrida.invencivel = Debug.invencivel;
+      const ox = alma.x, oy = alma.y;
+      const evs = J.corrida.passo(t, entrada);
+      const ca = J.corrida.alma;
+      alma.x = ca.x; alma.y = ca.y; alma.vx = ca.vx; alma.vy = ca.vy;
+      J.dica.movido += Math.hypot(alma.x - ox, alma.y - oy);
+      alma.olharX = alma.vx > 25 ? 1 : alma.vx < -25 ? -1 : 0;   // olhos seguem o movimento
+      alma.olharY = alma.vy > 25 ? 1 : alma.vy < -25 ? -1 : 0;
+      J.t = J.corrida.t;
+      J.batida = J.t / J.comp.B;
+      J.prog = J.corrida.prog;
       const r = alma.rastro[alma.rastroI]; r.x = alma.x; r.y = alma.y;
       alma.rastroI = (alma.rastroI + 1) % alma.rastro.length;
       if (alma.susto > 0) alma.susto -= dt;
-      if (matou) { alma.x = mx; alma.y = my; J.t = mt; morrer(matou); return; }
+      for (let i = 0; i < evs.length; i++) {
+        const e = evs[i];
+        if (e.tipo === 'ativou') aoEventoAtaque(e.o);
+        else if (e.tipo === 'moeda') pegarMoeda(e.s);
+        else if (e.tipo === 'raspao') raspar(e.o);
+        else if (e.tipo === 'morte') { morrer(e); return; }
+        else if (e.tipo === 'vitoria') { vencer(); return; }
+      }
       // passou o recorde nesta tentativa
       const pct = Math.floor(J.prog * 100);
       if (!J.passouMelhor && J.melhorAntes > 0 && pct > J.melhorAntes && !J.trapaca) {
@@ -289,13 +285,12 @@ const Game = (() => {
         Sound.sfx('passouMelhor');
       }
       if (J.dica.ativa && J.dica.movido > 30) J.dica.ativa = false;
-      if (t >= J.comp.duracao) vencer();
     } else if (J.estado === 'morto') {
-      Input.descartarArrasto();
+      pega.reancorar = true;
       const espera = J.recorde ? CONFIG.morte.atrasoReinicioRecorde : CONFIG.morte.atrasoReinicio;
       if (tempo - J.tMorte >= espera) comecarTentativa();
     } else if (J.estado === 'contagem') {
-      Input.descartarArrasto();
+      pega.reancorar = true;
       const passo = 0.32;
       const n = Math.floor((tempo - J.contagemIni) / passo);
       if (n > J.contagemTicks) { J.contagemTicks = n; if (n < 3) Sound.sfx('contagem'); }
@@ -305,7 +300,7 @@ const Game = (() => {
         J.estado = 'jogando';
       }
     } else if (J.estado === 'vitoria') {
-      Input.descartarArrasto();
+      pega.reancorar = true;
       if (tempo - J.tVitoria > 1.1 && !J.controles.itens.length) montarPainelVitoria();
       // confete
       if (tempo - J.tVitoria < 1.5 && frame % 3 === 0) {
@@ -314,7 +309,7 @@ const Game = (() => {
           2.2, cores[(Math.random() * cores.length) | 0], Math.random() < 0.5 ? 2 : 1, 30);
       }
     } else {
-      Input.descartarArrasto();
+      pega.reancorar = true;
     }
   }
 
@@ -336,30 +331,27 @@ const Game = (() => {
   }
 
   function pegarMoeda(s) {
-    J.moedas[s.id] = true;
     Sound.sfx('moeda');
     Particulas.explosao(CX + s.x, CY + s.y, 16, PAL.ouro, 70, 0.5);
     Flutuantes.add('+', CX + s.x, CY + s.y - 8, PAL.ouro, 0.6, 2);
   }
 
-  function morrer(o) {
+  function morrer(e) {
     J.estado = 'morto';
     Flutuantes.limpar();
     J.tMorte = tempo;
-    J.ataques.destaque = o;
+    J.t = e.t;
+    J.prog = J.corrida.prog;
     Sound.parar();
     Sound.sfx('morte');
-    const pct = Math.min(99, Math.floor(J.prog * 100));
+    const pct = e.pct;
     J.pctMorte = pct;
     const reg = Save.fase(J.fase.id);
-    reg.mortes[pct]++;
-    Save.dados.stats.mortes++;
-    J.recorde = !J.trapaca && pct > reg.melhor;
+    J.recorde = Save.registrarMorte(reg, pct, J.trapaca).recorde;
     if (J.recorde) {
-      reg.melhor = pct;
       setTimeout(() => Sound.sfx('recorde'), 140);
-    }
-    Save.gravarDepois();
+      Save.gravar();                     // recorde não pode se perder se o app fechar agora (B04)
+    } else Save.gravarDepois();
     J.textoMorte = { pct, recorde: J.recorde, ini: tempo };
     tremer(CONFIG.juice.tremidaMorte);
     flash(CONFIG.juice.flashMorte, '#ffffff');
@@ -381,22 +373,15 @@ const Game = (() => {
     J.tVitoria = tempo;
     J.prog = 1;
     const reg = Save.fase(J.fase.id);
-    const primeira = reg.vitorias === 0;
-    if (!J.trapaca) {
-      reg.vitorias++;
-      reg.melhor = 100;
-      for (let i = 0; i < 3; i++) if (J.moedas[i]) reg.moedas[i] = true;
-      Save.dados.stats.vitorias++;
-      if (Levels.indice(J.fase.id) === 0) Save.dados.primeiraVez = false;
-    }
-    J.ganhouEstrelas = primeira && !J.trapaca ? Levels.estrelasDe(J.fase.dificuldade) : 0;
+    J.ganhouEstrelas = Save.registrarVitoria(reg, J.corrida.moedas, J.trapaca, J.fase.dificuldade).estrelas;
+    if (!J.trapaca && Levels.indice(J.fase.id) === 0) Save.dados.primeiraVez = false;
     Save.gravar();
     Sound.sfx('vitoria');
     flash(0.5, '#ffffff');
     tremer(3);
     Particulas.explosao(CX + alma.x, CY + alma.y, 30, PAL.ouro, 140, 0.8);
     // tudo que sobrou vira fumaça
-    J.ataques.reiniciar(J.comp.duracao + 999, alma);
+    J.ataques.reiniciar(J.comp.duracao + 999, J.corrida.alma);
     J.controles.limpar();
   }
 
@@ -434,8 +419,19 @@ const Game = (() => {
     C.focar(pri);
   }
 
+  // Pausar durante a tela de morte: "continuar" começa a próxima tentativa.
+  function pausarNaMorte() {
+    if (J.estado !== 'morto') return;
+    J.estado = 'pausa';
+    J.recomecarAoContinuar = true;
+    Sound.sfx('menu');
+    montarPausa();
+  }
+
   function continuar() {
     J.controles.limpar();
+    J.avisoAudio = false;
+    if (J.recomecarAoContinuar) { J.recomecarAoContinuar = false; comecarTentativa(); return; }
     J.estado = 'contagem';
     J.contagemIni = tempo;
     J.contagemTicks = -1;
@@ -463,14 +459,12 @@ const Game = (() => {
         return;
       }
       if (J.estado === 'morto') {
+        if (e.t === 'tecla' && !e.repetida && (e.k === 'voltar' || e.k === 'pausa')) { pausarNaMorte(); return; }
+        if (e.t === 'down' && e.x > W - 34 && e.y < 26) { pausarNaMorte(); return; }
         if (tempo - J.tMorte < CONFIG.morte.toquePulaApos) return;
         if (e.t === 'tecla' && !e.repetida) {
-          if (e.k === 'voltar') { irPara('fases'); return; }
-          if (e.k && e.k !== 'pausa') comecarTentativa();
-        } else if (e.t === 'down') {
-          if (e.x > W - 34 && e.y < 26) { irPara('fases'); return; }
-          comecarTentativa();
-        }
+          if (e.k) comecarTentativa();
+        } else if (e.t === 'down') comecarTentativa();
         return;
       }
       if (J.estado === 'pausa' || J.estado === 'vitoria') {
@@ -520,7 +514,7 @@ const Game = (() => {
     c.beginPath(); c.rect(-HW, -HH, HW * 2, HH * 2); c.clip();
     const op = { hitbox: Debug.hitbox, reduzido: reduzido(), alma, frame,
       piscaMorte: J.estado === 'morto' && Math.floor((tempo - J.tMorte) * 12) % 2 === 0 };
-    J.ataques.desenhar(c, J.t, batida, op);
+    Render.ataques(c, J.ataques, J.t, batida, op);
     if (J.estado !== 'morto') desenharAlma(c);
     if (Debug.hitbox) {
       c.strokeStyle = '#ffff00'; c.beginPath(); c.arc(alma.x, alma.y, CONFIG.alma.raioRaspao, 0, Math.PI * 2); c.stroke();
@@ -624,7 +618,7 @@ const Game = (() => {
     if (J.temMoedas) {
       for (let i = 0; i < 3; i++) {
         const x = 8 + i * 10, y = 5;
-        if (J.moedas[i]) c.drawImage(Sprites.moeda(true), x, y);
+        if (J.corrida.moedas[i]) c.drawImage(Sprites.moeda(true), x, y);
         else if (reg.moedas[i]) { c.globalAlpha = 0.35; c.drawImage(Sprites.moeda(true), x, y); c.globalAlpha = 1; }
         else c.drawImage(Sprites.moeda(false), x, y);
       }
@@ -675,6 +669,7 @@ const Game = (() => {
     UI.painel(c, (W - 190) / 2, 52, 190, 146, { fundo: PAL.fundo2, borda: PAL.branco });
     UI.texto(c, t('pausado'), CX, 62, { escala: 2, alinhar: 'centro', cor: PAL.branco });
     UI.texto(c, J.fase.nome + ' · ' + Math.floor(J.prog * 100) + '%', CX, 84, { alinhar: 'centro', cor: J.cor });
+    if (J.avisoAudio) UI.texto(c, t('audioInterrompido'), CX, 206, { alinhar: 'centro', cor: PAL.ouro, sombra: PAL.preto });
     J.controles.desenhar(c, tempo);
   }
 
@@ -763,10 +758,28 @@ const Game = (() => {
       ctx.imageSmoothingEnabled = false;
       tela.desenhar(ctx);
     } catch (err) {
-      console.error(err);
+      Erros.registrar(err, 'loop/' + nomeTela);
       if (Debug.ativo) Debug.erro(err);
+      // um erro no meio do desenho deixa save()/clip()/translate() abertos e todos os frames
+      // seguintes sairiam tortos (B19): limpa o estado do canvas
+      for (let i = 0; i < 16; i++) ctx.restore();
+      ctx.setTransform(1, 0, 0, 1, 0, 0);
+      ctx.globalAlpha = 1;
+      ctx.globalCompositeOperation = 'source-over';
     }
+    try { desenharAvisos(ctx); } catch (e) { /* o aviso nunca derruba o jogo */ }
     if (Debug.ativo) Debug.frame(dt, ms);
+  }
+
+  // Avisos discretos no rodapé: erro registrado, save recuperado.
+  function desenharAvisos(c) {
+    let txt = null, cor = PAL.ouro;
+    if (Erros.recente(4)) { txt = t('erroAviso'); cor = PAL.perigoClaro; }
+    else if (Save.recuperado && tempo < 8) txt = Save.recuperado === 'backup' ? t('saveRecuperado') : t('savePerdido');
+    if (!txt) return;
+    const w = UI.largura(txt) + 10;
+    c.globalAlpha = 0.85; c.fillStyle = PAL.preto; c.fillRect(Math.round(CX - w / 2), H - 13, w, 11); c.globalAlpha = 1;
+    UI.texto(c, txt, CX, H - 11, { alinhar: 'centro', cor });
   }
 
   function redimensionar() {
@@ -783,7 +796,7 @@ const Game = (() => {
     if (nomeTela !== 'jogo' || !Save.config.pausaAuto) return;
     if (J.estado === 'jogando') pausar();
     else if (J.estado === 'contagem') { J.estado = 'pausa'; montarPausa(); }
-    else if (J.estado === 'morto') J.pausarAoVoltar = true;
+    else if (J.estado === 'morto') pausarNaMorte();
   }
 
   function init() {
@@ -792,6 +805,7 @@ const Game = (() => {
     ctx = canvas.getContext('2d', { alpha: false });
     ctx.imageSmoothingEnabled = false;
     Save.carregar();
+    Save.instalar();
     Input.init(canvas);
     Input.destino = (e) => {
       if (e.t === 'down' || e.t === 'up' || e.t === 'tecla') Sound.iniciar();   // iOS só libera áudio em alguns eventos
@@ -822,15 +836,19 @@ const Game = (() => {
     J, alma,
     pausar, comecarTentativa,
     // debug/testes: mata a alma agora (como se encostasse num ataque)
-    matar() { if (nomeTela === 'jogo' && J.estado === 'jogando') morrer({ s: { k: 0 } }); },
+    matar() {
+      if (nomeTela !== 'jogo' || J.estado !== 'jogando') return;
+      J.corrida.morrer({ s: { k: 0 } }, J.t);
+      morrer(J.corrida.morte);
+    },
     // debug: pula para um % da fase atual
     pular(pct) {
       if (nomeTela !== 'jogo' || !J.fase) return;
       J.trapaca = true;
       const t0 = Math.max(0, Math.min(0.999, pct)) * J.comp.duracao;
-      J.ataques.reiniciar(t0, alma);
+      J.corrida.reiniciar(t0);
       Sound.tocar(J.fase.musica, { desde: t0, vel: Debug.vel });
-      J.t = t0; J.batida = t0 / J.comp.B; J.estado = 'jogando'; J.controles.limpar();
+      J.t = t0; J.batida = t0 / J.comp.B; J.prog = J.corrida.prog; J.estado = 'jogando'; J.controles.limpar();
     },
     W, H, CX, CY, HW, HH,
   };
