@@ -74,7 +74,9 @@ const Editor = (() => {
     const lim = limites(ev.tipo, c.k);
     if (c.t === 'num' || c.t === 'int') {
       let v = valor(ev, c);
+      if (Array.isArray(v)) v = v[0];                                     // lista (de outro modo, ex.: buraco → fechar): usa a 1ª (B26)
       if (v === undefined) v = c.k === 'ate' ? lista(ev.pos)[0] : 0;     // opcional vazio: começa de um valor razoável
+      if (!Number.isFinite(v)) v = Number.isFinite(c.padrao) ? c.padrao : 0;
       v = c.t === 'int' ? Math.round(v + dir) : arred(Math.round((v + dir * c.passo) / c.passo) * c.passo);
       ev[c.k] = clamp(v, lim.min, lim.max);
     } else if (c.t === 'bool') {

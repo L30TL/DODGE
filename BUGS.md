@@ -182,3 +182,10 @@ Encontrados na auditoria da Etapa 0 (17/11/2026). "Sonda" = teste de navegador q
 - **Causa:** a folga da hitbox (`CONFIG.ataques.folgaHitbox`, "hitbox menor que o desenho") era SUBTRAÍDA da distância nas paredes e nos muros com vão — deixando a hitbox deles 1 px MAIOR que o desenho. Nas balas e lasers estava certo.
 - **Correção:** paredes e muros somam a folga, como os outros ataques (ficaram 2 px mais justos com o jogador).
 - **Teste:** `tests/sim.test.js` › parede: a hitbox é menor que o desenho; e a prova construtiva das fases oficiais.
+
+## B26 — Editor: setinha do centro das paredes virava NaN depois de trocar de modo · corrigido (0.7.0)
+- **Encontrado:** na Sessão 6, pelo fuzzing do editor (`tests/fuzz.test.js`).
+- **Reproduzir:** paredes no modo BURACO com 2+ posições no centro → trocar o modo pra FECHAR → apertar ◀/▶ do CENTRO: o centro virava um valor inválido (a parede sumia).
+- **Causa:** no modo FECHAR o centro é um número, mas o valor continuava sendo a lista do modo BURACO; somar o passo numa lista dá NaN.
+- **Correção:** as setinhas de campo numérico usam o primeiro valor quando encontram uma lista (e o padrão se o valor não for um número).
+- **Teste:** `tests/fuzz.test.js` (3 sementes × 1500 operações aleatórias no editor).

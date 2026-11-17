@@ -2,6 +2,26 @@
 
 O que mudou em cada versão. Bugs com número (B01…) estão detalhados em `BUGS.md`.
 
+## 0.7.0-dev — Overhaul, Sessão 6: fim da Etapa 1 (17/11/2026)
+
+### Solver novo
+- Passo de 1/60 s numa grade centrada; a alma precisa estar a salvo durante o passo **inteiro** (antes dava pra "escapar no último instante" entre dois passos, o que no jogo de verdade mata); cada perigo é conferido também no último instante em que está ativo.
+- **Prova construtiva**: o solver refaz um caminho que sobrevive e joga a fase seguindo ele na simulação de verdade. As 3 fases oficiais estão **PROVADAS** (teste automático e `verificar-fases`).
+- Debug: **S** assiste o solver jogando a fase.
+
+### Estresse e fuzzing
+- 500 restarts seguidos: +0,5 MB de memória, música×jogo ~3 ms, nenhuma nota atrasada.
+- Modo infinito por 30 minutos de jogo (24 voltas, entradas malucas): nenhum erro, nenhum NaN (`tools/estresse-infinito.js`).
+- Fuzzing do editor (4.500 operações aleatórias) e um "macaco" apertando tudo em todas as telas (2.000+ ações): nenhum erro.
+- Sondas novas: sem internet (zero pedidos de rede depois de carregar) e armazenamento cheio (o jogo segue e avisa).
+
+### Painel F3
+- **F3** abre o painel de debug em qualquer tela (sem `?debug=1`): fps, pior frame, %, projéteis/pool, partículas, **áudio × jogo**, latência; botões e teclas de pular %, hitbox, câmera lenta, invencível, bot e solver. Fechar desliga as trapaças.
+
+### Correções
+- Paredes matavam 1 px antes de encostar no desenho (B25).
+- Editor: setinha do centro das paredes virava NaN depois de trocar de modo (B26).
+
 ## 0.6.0-dev — Overhaul, Sessão 5: treino, infinito, inglês, perfil (17/11/2026)
 
 ### Modos

@@ -10,7 +10,7 @@
 // =============================================================================
 
 const Debug = (() => {
-  const ativo = typeof location !== 'undefined' && /[?&]debug=1/.test(location.search);
+  const ativo = typeof location !== 'undefined' && /[?&]debug=1/.test(location.search);   // ?debug=1, ou F3 a qualquer hora
   let painel = null, el = {};
   let fpsAcum = 0, fpsN = 0, fpsMax = 0, ultimoPainel = 0;
   let ultimoErro = null;
@@ -24,8 +24,18 @@ const Debug = (() => {
     bot: false,
 
     init() {
+      // F3 abre/fecha o painel de debug em qualquer tela (usar o debug não conta recorde nem vitória)
+      window.addEventListener('keydown', (ev) => { if (ev.code === 'F3') { ev.preventDefault(); D.alternar(); } });
       if (!ativo) return;
       criarPainel();
+    },
+
+    alternar() {
+      if (!painel) { criarPainel(); D.ativo = true; return; }
+      const aberto = painel.style.display !== 'none';
+      painel.style.display = aberto ? 'none' : '';
+      D.ativo = !aberto;
+      if (aberto) { D.invencivel = false; D.bot = false; D.caminho = null; D.hitbox = false; if (D.vel !== 1) { D.vel = 1; Sound.velocidade(1); } }
     },
 
     frame(dt, ms) {
@@ -40,6 +50,8 @@ const Debug = (() => {
       if (Game.nomeTela === 'jogo' && J.fase) {
         linhas.push(`t ${J.t.toFixed(2)}s · batida ${J.batida.toFixed(1)} · ${(J.prog * 100).toFixed(1)}%`);
         linhas.push(`projéteis ${J.ataques.n}/${J.ataques.pool.length} (estouros ${J.ataques.estourou}) · partículas ${Game.Particulas.ativas()}`);
+        if (J.estado === 'jogando' && Sound.tocando()) linhas.push(`áudio × jogo: ${((Sound.posicao() - J.t) * 1000).toFixed(1)} ms`);
+        if (D.caminho) linhas.push('assistindo o solver (S desliga)');
       }
       linhas.push(`áudio: atrasadas ${Sound.stats.atrasadas} · sfx ${Sound.stats.sfxAtivos} · latência ${(Sound.latencia() * 1000).toFixed(0)} ms`);
       if (ultimoErro) linhas.push('ERRO: ' + ultimoErro);

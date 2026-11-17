@@ -163,7 +163,7 @@ async function novaPagina(browser, init) {
     await ctx.close();
   }
 
-  // P10: 200 mortes+restarts: memória, sincronia, nós de áudio
+  // P10: 500 mortes+restarts: memória, sincronia, nós de áudio (Etapa 1: 500 seguidos)
   {
     const { ctx, page } = await novaPagina(browser);
     const cdp = await ctx.newCDPSession(page);
@@ -172,7 +172,7 @@ async function novaPagina(browser, init) {
     await page.waitForTimeout(1000);
     await cdp.send('HeapProfiler.collectGarbage');
     const h0 = (await cdp.send('Runtime.getHeapUsage')).usedSize;
-    for (let i = 0; i < 200; i++) {
+    for (let i = 0; i < 500; i++) {
       await page.evaluate(() => new Promise((fim) => {
         const n = Game.J.tentativa; Game.matar();
         const esp = () => (Game.J.estado === 'jogando' && Game.J.tentativa === n + 1) ? fim() : requestAnimationFrame(esp);
@@ -184,8 +184,46 @@ async function novaPagina(browser, init) {
     await cdp.send('HeapProfiler.collectGarbage');
     const h1 = (await cdp.send('Runtime.getHeapUsage')).usedSize;
     const r = await page.evaluate(() => ({ dif: (Sound.posicao() - Game.J.t) * 1000, atrasadas: Sound.stats.atrasadas, sfx: Sound.stats.sfxAtivos }));
-    ok('P10 200 restarts seguidos', (h1 - h0) > 2e6 || r.atrasadas > 0 || r.sfx > 5,
+    ok('P10 500 restarts seguidos', (h1 - h0) > 2e6 || r.atrasadas > 0 || r.sfx > 5,
       `heap ${(h0 / 1e6).toFixed(1)} → ${(h1 / 1e6).toFixed(1)} MB, música×jogo ${r.dif.toFixed(1)} ms, notas atrasadas ${r.atrasadas}, sons vivos ${r.sfx}`);
+    await ctx.close();
+  }
+
+  // P12: sem internet: depois de carregar, o jogo não faz nenhum pedido de rede e roda normal
+  {
+    const { ctx, page } = await novaPagina(browser);
+    const pedidos = [];
+    page.on('request', (r) => pedidos.push(r.url()));
+    await ctx.setOffline(true);
+    const erros = [];
+    page.on('pageerror', (e) => erros.push(e.message));
+    await page.evaluate(() => { Game.jogar(Levels.FASES[0]); });
+    await page.waitForTimeout(1500);
+    await page.evaluate(() => { Game.matar(); });
+    await page.waitForTimeout(800);
+    await page.evaluate(() => Game.irPara('editor', { fase: Criadas.nova({ nome: 'X', musica: 'despertar', bpm: 112, duracaoBatidas: 113 }) }));
+    await page.waitForTimeout(400);
+    const st = await page.evaluate(() => ({ tela: Game.nomeTela, estado: Game.J.estado }));
+    ok('P12 sem internet', pedidos.length > 0 || erros.length > 0 || st.tela !== 'editor',
+      `offline: ${pedidos.length} pedidos de rede depois de carregar, ${erros.length} erros, foi pro editor = ${st.tela === 'editor'}`);
+    await ctx.close();
+  }
+
+  // P13: armazenamento cheio (cota estourada): o jogo continua e avisa que não salva
+  {
+    const { ctx, page } = await novaPagina(browser, () => {
+      const orig = Storage.prototype.setItem;
+      Storage.prototype.setItem = function (k, v) { if (String(k).startsWith('dodge.') && window.__cheio) throw new DOMException('cheio', 'QuotaExceededError'); return orig.call(this, k, v); };
+    });
+    const erros = [];
+    page.on('pageerror', (e) => erros.push(e.message));
+    await page.evaluate(() => { window.__cheio = true; Game.jogar(Levels.FASES[0]); });
+    await page.waitForTimeout(1200);
+    await page.evaluate(() => { Game.matar(); Save.gravar(); });
+    await page.waitForTimeout(700);
+    const r = await page.evaluate(() => ({ estado: Game.J.estado, disponivel: Save.disponivel, tentativas: Save.fase('despertar').tentativas }));
+    ok('P13 armazenamento cheio', erros.length > 0 || r.estado !== 'jogando' || r.disponivel !== false || r.tentativas < 2,
+      `cota estourada: jogo ${r.estado}, save disponível = ${r.disponivel} (aviso nas configurações), tentativas na memória ${r.tentativas}, erros ${erros.length}`);
     await ctx.close();
   }
 

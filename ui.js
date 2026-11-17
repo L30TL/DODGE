@@ -1179,6 +1179,7 @@ UI.telas.fases = (() => {
     desenhar(c) {
       const tm = Game.tempo;
       const L = lista();
+      if (idx >= L.length) idx = L.length - 1;            // o F3 fechou e o Laboratório saiu da lista
       const f = L[idx];
       const cor = COR_DIFICULDADE[f.dificuldade];
       Game.desenharFundo(c, tm * 92 / 60, 0.25, cor, false);

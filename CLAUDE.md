@@ -4,7 +4,7 @@ Jogo arcade 2D de navegador: uma alma presa numa caixa desvia de ataques que cae
 
 ## Fase atual
 - **Fase 1** (núcleo): completa e no ar em https://l30tl.github.io/DODGE/ (GitHub Pages, branch `main`).
-- **OVERHAUL** (veja `DESIGN.md › OVERHAUL`): Etapa 0 (auditoria) concluída e aprovada. **Sessão 1 (fundação) concluída em 17/11/2026** (versão 0.2.0-dev): simulação pura, render separado, save v2, captura de erros, validador, 24 testes, bugs B01–B17, B19, B20 corrigidos (B18 fica pra Etapa 5). **Sessão 2 (editor) concluída em 17/11/2026** (0.3.0-dev): modificadores da caixa (encolher, girar, escurecer, inverter, espelho) no motor, editor completo (linha do tempo com a música, ímã, paleta, inspetor, prévia, tocar, testar daqui, desfazer, salvamento automático), Minhas Fases, B21. **Sessão 3 concluída** (0.4.0-dev): verificar vencendo do começo + solver, código curto de compartilhar e importar, filtro de palavrão, jogar fases criadas, B22. **Sessão 4 concluída** (0.5.0-dev): moedas comuns, guarda-roupa/loja/coleção, avatar em 7 camadas, 16 conquistas, missões diárias/semanais, save v3. **Sessão 5 concluída** (0.6.0-dev): treino com checkpoints, modo infinito, inglês, Demons travados por estrelas, perfil (nick, efeitos, emblemas, molduras), save v4, B23–B24. **Próxima: Sessão 6** (resto da Etapa 1: solver novo, estresse, fuzzing, casos de borda, painel F3, navegadores) — **e aí para pra você testar**. Histórico em `CHANGELOG.md`, bugs em `BUGS.md`.
+- **OVERHAUL** (veja `DESIGN.md › OVERHAUL`): Etapa 0 (auditoria) concluída e aprovada. **Sessão 1 (fundação) concluída em 17/11/2026** (versão 0.2.0-dev): simulação pura, render separado, save v2, captura de erros, validador, 24 testes, bugs B01–B17, B19, B20 corrigidos (B18 fica pra Etapa 5). **Sessão 2 (editor) concluída em 17/11/2026** (0.3.0-dev): modificadores da caixa (encolher, girar, escurecer, inverter, espelho) no motor, editor completo (linha do tempo com a música, ímã, paleta, inspetor, prévia, tocar, testar daqui, desfazer, salvamento automático), Minhas Fases, B21. **Sessão 3 concluída** (0.4.0-dev): verificar vencendo do começo + solver, código curto de compartilhar e importar, filtro de palavrão, jogar fases criadas, B22. **Sessão 4 concluída** (0.5.0-dev): moedas comuns, guarda-roupa/loja/coleção, avatar em 7 camadas, 16 conquistas, missões diárias/semanais, save v3. **Sessão 5 concluída** (0.6.0-dev): treino com checkpoints, modo infinito, inglês, Demons travados por estrelas, perfil (nick, efeitos, emblemas, molduras), save v4, B23–B24. **Sessão 6 concluída** (0.7.0-dev): solver novo (1/60 s, passo inteiro seguro, prova construtiva — as 3 fases oficiais PROVADAS), 500 restarts, infinito 30 min, fuzzing do editor, macaco no navegador, sondas sem internet/armazenamento cheio, painel F3, B25–B26. **ETAPA 1 COMPLETA — parado esperando o usuário testar.** Depois: Sessão 7 (Etapa 2). Histórico em `CHANGELOG.md`, bugs em `BUGS.md`.
 
 ## Plano do overhaul por sessão
 Ordem combinada: o que falta do roadmap original entra antes das etapas novas; a fundação da Etapa 1 vem primeiro porque o editor, o solver e os testes dependem dela.
@@ -50,8 +50,8 @@ HTML5 Canvas + JavaScript puro, sem frameworks e sem build. Scripts clássicos c
 | `render.js` | `Render` | Desenho dos ataques (avisos, balas — em camada de pixels quando são muitas —, lasers, paredes, moedas, hitboxes) |
 | `levels.js` | `Levels` | Fases como dados `{ id, nome, autor, dificuldade, musica, bpm, duracaoBatidas, eventos }` |
 | `game.js` | `Game` | Loop, navegação, tela de jogo: lê o tempo do áudio, passa a entrada pra `Sim.Corrida` e transforma os eventos em som/partículas/save |
-| `solver.js` | `Solver` | PURO: prova que a fase é vencível (alcançabilidade), inteira ou aos poucos (`Solver.Analise(f).avancar(ms)`) |
-| `debug.js` | `Debug` | Painel `?debug=1`, bot, mapa de mortes (o analisador mora no `solver.js`) |
+| `solver.js` | `Solver` | PURO: alcançabilidade a 1/60 s (vencível, aperto, curva), inteira ou aos poucos (`Analise(f).avancar(ms)`), caminho e prova construtiva (`provar`) |
+| `debug.js` | `Debug` | Painel de debug (F3 a qualquer hora, ou `?debug=1`), bot, assistir o solver (S), mapa de mortes |
 | `editor.js` | `Editor`, telas `editor` e `criadas` | Núcleo puro (campos do inspetor, ímã, compilação pra linha do tempo, desfazer) + telas do editor e de Minhas Fases |
 | `profile.js` | telas `visual`, `missoes` | Guarda-roupa + loja + coleção; missões e conquistas (Dodge ID na Fase 4) |
 | `tools/verificar-fases.js` | — | CLI Node: prova que as fases são vencíveis + bots |
@@ -63,11 +63,11 @@ HTML5 Canvas + JavaScript puro, sem frameworks e sem build. Scripts clássicos c
 python3 -m http.server 8000
 ```
 Abrir http://localhost:8000. Debug: http://localhost:8000/?debug=1
-(teclas no debug: H hitbox, I invencível, L câmera lenta, B bot, K morrer, 0–9 pula pra 0–90%, [ ] ±5%)
+(F3 abre o debug em qualquer tela. Teclas: H hitbox, I invencível, L câmera lenta, B bot, S assistir o solver, K morrer, 0–9 pula pra 0–90%, [ ] ±5%)
 
 Testes (precisa de Node; nenhuma biblioteca):
 ```bash
-node --test                              # 62 testes, ~60 s
+node --test                              # 64 testes, ~70 s
 node tools/verificar-fases.js            # prova que as fases são vencíveis + bots
 DETALHE=1 node tools/verificar-fases.js prensa
 node tools/navegador/regressao.js        # com o servidor ligado; precisa do Playwright
@@ -76,6 +76,8 @@ node tools/navegador/modificadores.js    # caixa girada/encolhida/escura/inverti
 node tools/navegador/compartilhar.js     # verificar vencendo, código, importar, filtro, jogar fase criada
 node tools/navegador/progresso.js        # save v2→v3, moedas jogando, missões, conquista, loja
 node tools/navegador/sessao5.js          # treino (checkpoints), perfil, modo infinito
+node tools/navegador/macaco.js 60        # toques/teclas/roda aleatórios em todas as telas
+node tools/estresse-infinito.js 30       # modo infinito 30 min de jogo na simulação (Node)
 ```
 
 ## Regras de trabalho
