@@ -377,7 +377,7 @@ const Sprites = (() => {
     moeda: ['..###..', '.#ooo#.', '#oo#oo#', '#o###o#', '#oo#oo#', '.#ooo#.', '..###..'],
     moedaVazia: ['..###..', '.#...#.', '#.....#', '#.....#', '#.....#', '.#...#.', '..###..'],
     pausa: ['##.##', '##.##', '##.##', '##.##', '##.##', '##.##', '##.##'],
-    engrenagem: ['...#...', '.#.#.#.', '..###..', '###.###', '..###..', '.#.#.#.', '...#...'],
+    engrenagem: ['..#.#..', '.#####.', '###.###', '##...##', '###.###', '.#####.', '..#.#..'],
     repetir: ['..####.', '.#....#', '#......', '#....##', '#.....#', '.#...#.', '..###..'],
     lista: ['#.#####', '.......', '#.#####', '.......', '#.#####', '.......', '#.#####'],
     setaDir: ['#....', '##...', '###..', '####.', '###..', '##...', '#....'],
@@ -406,8 +406,7 @@ const Sprites = (() => {
       '#wwwwkwwww#',
       '#wwwkkkwww#',
       '#wwkkkkkww#',
-      '#wwwwkwwww#',
-      '#wwwwkwwww#',
+      '#wkkkkkkkw#',
       '#wwwwwwwww#',
       '#sssssssss#',
       '.#########.',
@@ -737,7 +736,7 @@ UI.telas.titulo = (() => {
           UI.texto(c, L, x + 3, cy + dy + 3, { escala: esc, cor: PAL.almaEscura });
           UI.texto(c, L, x, cy + dy, { escala: esc, cor: PAL.branco });
         } else {
-          desenharAlmaGrande(c, x + larg / 2, cy + 3.5 * esc, 4.5, tm, 'normal');
+          desenharAlmaGrande(c, x + larg / 2, cy + 3.5 * esc, 5, tm, 'normal');
         }
         x += larg + gap;
       });

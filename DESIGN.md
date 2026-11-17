@@ -123,3 +123,15 @@ Fase 4, Dodge ID e online: contas, perfis públicos, upload com aprovação, pub
 _(registro de decisões tomadas durante o desenvolvimento; a mais recente embaixo)_
 
 - 2026-11-16 — Repositório: `github.com/L30TL/DODGE` (já existia). Desenvolvimento no branch `claude/funny-ptolemy-kgztmw`; o GitHub Pages vai publicar a partir do `main`.
+- 2026-11-17 — **Resolução lógica 480×270** (grade de pixel). O canvas é ampliado pelo navegador com `image-rendering: pixelated`; quando cabe 3× ou mais, a escala é inteira (pixels perfeitos).
+- 2026-11-17 — **Nomes das dificuldades** (no objeto `TEXTOS`): Fácil, Normal, Difícil, Dificílimo, Insano, Demônio. Os ids nos dados são `facil`, `normal`, `dificil`, `dificilimo`, `insano`, `demonio`. Interpretação: "Easy, Medium, Hard, Insane e Extreme Demon" são os 5 níveis *dentro* de Demônio (Fase 3).
+- 2026-11-17 — **Ícones de dificuldade**: a própria alma (bolinha) com expressões diferentes por dificuldade (calma → determinada → brava → olhos doidos → chifres). Arte original.
+- 2026-11-17 — **Restart automático** 0,4 s depois da morte (0,45 s quando bate recorde). Tocar/apertar qualquer tecla reinicia na hora. O "87%" continua visível, sumindo, no começo da tentativa seguinte. `R` reinicia a qualquer momento.
+- 2026-11-17 — **Contador de tentativas** é o total da fase (salvo), não só da sessão.
+- 2026-11-17 — **Formato dos eventos**: `batida` é quando o ataque fica PERIGOSO (bate com a música); o aviso aparece `aviso` batidas antes. Posições normalizadas de -1 a 1 dentro da caixa. A vitória acontece em `duracaoBatidas`, no acorde final da música.
+- 2026-11-17 — **Avisos**: até Insane, o motor força aviso mínimo de max(1 batida, 0,3 s), mesmo se a fase pedir menos.
+- 2026-11-17 — **Determinismo**: a posição de cada projétil é função do tempo da música (não de frames). Isso permite pular pra qualquer % na hora (debug, e no futuro treino/editor).
+- 2026-11-17 — **Moedas secretas** só ficam salvas se você vencer a fase naquela tentativa. Estrelas e moedas já aparecem na Fase 1 (a loja/progressão é da Fase 3).
+- 2026-11-17 — **Pausa** para a música; ao continuar há contagem 3-2-1 e a música volta exatamente da posição pausada.
+- 2026-11-17 — Além das 3 músicas das fases, há uma **música de menu** curta em loop.
+- 2026-11-17 — **Verificação de fases** (`node tools/verificar-fases.js`): prova por alcançabilidade que a fase é vencível e roda bots com tempo de reação de 150/250/350 ms como termômetro de dificuldade. Modo debug usa `?debug=1`; usar debug (pular, invencível, bot) não conta recorde nem vitória.

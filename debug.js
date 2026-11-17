@@ -3,7 +3,7 @@
 // DODGE — debug.js
 // Só liga com ?debug=1 na URL. Ferramentas:
 //   - pular pra qualquer % (teclas 0–9 = 0%–90%, [ e ] = ±5%)
-//   - H: hitboxes · I: invencível · L: câmera lenta · B: bot (piloto automático)
+//   - H: hitboxes · I: invencível · L: câmera lenta · B: bot (piloto automático) · K: morrer
 //   - mapa de mortes da fase (histograma por %)
 //   - "Analisar": prova que a fase é vencível (alcançabilidade) e mostra os
 //     trechos mais apertados. Também roda no Node: tools/verificar-fases.js
@@ -59,6 +59,7 @@ const Debug = (() => {
       if (c === 'KeyI') { D.invencivel = !D.invencivel; marcarTrapaca(); return true; }
       if (c === 'KeyL') { trocarVel(); return true; }
       if (c === 'KeyB') { D.bot = !D.bot; marcarTrapaca(); return true; }
+      if (c === 'KeyK') { Game.matar(); return true; }
       if (Game.nomeTela === 'jogo') {
         const m = /^Digit(\d)$/.exec(c);
         if (m) { Game.pular(+m[1] / 10); return true; }

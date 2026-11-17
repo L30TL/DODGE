@@ -213,6 +213,7 @@ const Game = (() => {
     J.batida = t0 / J.comp.B;
     J.estado = 'jogando';
     Flutuantes.limpar();
+    if (J.pausarAoVoltar) { J.pausarAoVoltar = false; pausar(); }
   }
 
   function moverAlma(dt) {
@@ -343,6 +344,7 @@ const Game = (() => {
 
   function morrer(o) {
     J.estado = 'morto';
+    Flutuantes.limpar();
     J.tMorte = tempo;
     J.ataques.destaque = o;
     Sound.parar();
@@ -589,10 +591,12 @@ const Game = (() => {
       c.fillRect(x - 18, y + 13, 1, 3); c.fillRect(x + 17, y + 13, 1, 3);
     } else {
       const tecla = Sprites.desenho('tecla', PAL.preto);
-      const k = (dx, dy, rot) => {
-        c.save(); c.translate(x + dx, y + dy + 5); c.rotate(rot); c.drawImage(tecla, -5, -5); c.restore();
+      // 4 teclas de seta (a de cima, e as de baixo giradas em 90°)
+      const k = (dx, dy, quartos) => {
+        c.save(); c.translate(x + dx, y + dy); c.rotate(quartos * Math.PI / 2);
+        c.drawImage(tecla, -5, -4); c.restore();
       };
-      k(0, 0, 0); k(-12, 11, -Math.PI / 2); k(0, 11, Math.PI); k(12, 11, Math.PI / 2);
+      k(0, 0, 0); k(-12, 10, -1); k(0, 10, 2); k(12, 10, 1);
     }
     c.globalAlpha = 1;
   }
@@ -647,10 +651,11 @@ const Game = (() => {
         const fade = u < vida - 0.5 ? 1 : (vida - u) / 0.5;
         const pop = u < 0.08 ? 1 + (0.08 - u) * 6 : 1;
         c.globalAlpha = fade;
-        UI.texto(c, tm.pct + '%', CX, CY - 22, { escala: Math.round(6 * pop), alinhar: 'centro', cor: tm.recorde ? PAL.ouro : PAL.branco, sombra: PAL.preto });
+        const yPct = CY - HH + (tm.recorde ? 30 : 16);
+        UI.texto(c, tm.pct + '%', CX, yPct, { escala: Math.round(6 * pop), alinhar: 'centro', cor: tm.recorde ? PAL.ouro : PAL.branco, sombra: PAL.preto });
         if (tm.recorde) {
           if (Math.floor(u * 6) % 2 === 0 || u > 0.6) {
-            UI.texto(c, t('novoRecorde'), CX, CY - 46, { escala: 2, alinhar: 'centro', cor: PAL.ouro, sombra: PAL.preto, onda: { fase: tempo * 8, amp: 1 } });
+            UI.texto(c, t('novoRecorde'), CX, CY - HH + 10, { escala: 2, alinhar: 'centro', cor: PAL.ouro, sombra: PAL.preto });
           }
         }
         c.globalAlpha = 1;
@@ -675,7 +680,7 @@ const Game = (() => {
 
   function desenharContagem(c) {
     const n = 3 - Math.floor((tempo - J.contagemIni) / 0.32);
-    if (n >= 1) UI.texto(c, String(n), CX, CY - 20, { escala: 6, alinhar: 'centro', cor: PAL.branco, sombra: PAL.preto });
+    if (n >= 1) UI.texto(c, String(n), CX, CY - HH + 16, { escala: 6, alinhar: 'centro', cor: PAL.branco, sombra: PAL.preto });
   }
 
   function desenharVitoria(c) {
@@ -775,7 +780,10 @@ const Game = (() => {
   }
 
   function aoPerderFoco() {
-    if (nomeTela === 'jogo' && J.estado === 'jogando' && Save.config.pausaAuto) pausar();
+    if (nomeTela !== 'jogo' || !Save.config.pausaAuto) return;
+    if (J.estado === 'jogando') pausar();
+    else if (J.estado === 'contagem') { J.estado = 'pausa'; montarPausa(); }
+    else if (J.estado === 'morto') J.pausarAoVoltar = true;
   }
 
   function init() {
@@ -786,7 +794,7 @@ const Game = (() => {
     Save.carregar();
     Input.init(canvas);
     Input.destino = (e) => {
-      if (e.t === 'down' || e.t === 'tecla') Sound.iniciar();
+      if (e.t === 'down' || e.t === 'up' || e.t === 'tecla') Sound.iniciar();   // iOS só libera áudio em alguns eventos
       if (Debug.ativo && e.t === 'tecla' && Debug.tecla(e)) return;
       if (tela && tela.evento) tela.evento(e);
     };
@@ -798,6 +806,8 @@ const Game = (() => {
       if (m.matches && Input.temToque()) aoPerderFoco();
     });
     redimensionar();
+    const girar = document.getElementById('girar');
+    if (girar) girar.lastChild.textContent = t('girarCelular');
     Debug.init();
     irPara('titulo');
     requestAnimationFrame((ms) => { ultimoMs = ms; loop(ms); });
@@ -811,6 +821,8 @@ const Game = (() => {
     get canvas() { return canvas; },
     J, alma,
     pausar, comecarTentativa,
+    // debug/testes: mata a alma agora (como se encostasse num ataque)
+    matar() { if (nomeTela === 'jogo' && J.estado === 'jogando') morrer({ s: { k: 0 } }); },
     // debug: pula para um % da fase atual
     pular(pct) {
       if (nomeTela !== 'jogo' || !J.fase) return;

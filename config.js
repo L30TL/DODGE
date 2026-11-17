@@ -73,11 +73,11 @@ const CONFIG = {
   // --------------------------------------------------------------- morte -----
   morte: {
     atrasoReinicio: 0.4,         // s — depois de morrer, a próxima tentativa começa sozinha nesse tempo
-    atrasoReinicioRecorde: 0.85, // s — um pouco mais quando bate recorde, pra curtir
+    atrasoReinicioRecorde: 0.45, // s — quase igual quando bate recorde (o texto continua visível na próxima)
     toquePulaApos: 0.12,         // s — depois disso, tocar/apertar reinicia na hora
     congelar: 0.05,              // s — "hit-stop": o jogo congela um instante na morte
     particulas: 1,               // multiplicador de partículas da explosão
-    textoDuracao: 1.3,           // s — o "87%" continua visível (sumindo) no começo da tentativa seguinte
+    textoDuracao: 1.6,           // s — o "87%" continua visível (sumindo) no começo da tentativa seguinte
   },
 
   // --------------------------------------------------------------- juice -----

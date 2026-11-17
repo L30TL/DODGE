@@ -573,7 +573,7 @@ const Sound = (() => {
     // Chame dentro de um toque/clique: cria/libera o AudioContext (iOS/Chrome exigem gesto).
     iniciar() {
       if (ctx) {
-        if (ctx.state !== 'running') ctx.resume().catch(() => {});
+        if (ctx.state !== 'running') { destravar(); ctx.resume().catch(() => {}); }
         return true;
       }
       const AC = window.AudioContext || window.webkitAudioContext;
@@ -586,9 +586,7 @@ const Sound = (() => {
       }
       criarGrafo();
       API.volumes();
-      // destrava o áudio no iOS tocando um buffer mudo
-      const b = ctx.createBuffer(1, 1, 22050), s = ctx.createBufferSource();
-      s.buffer = b; s.connect(ctx.destination); s.start(0);
+      destravar();
       if (ctx.state !== 'running') ctx.resume().catch(() => {});
       return true;
     },
@@ -659,6 +657,8 @@ const Sound = (() => {
     },
 
     tocando() { return toc.tocando; },
+    // pra testes: âncora atual da música e o relógio cru
+    _estado() { return { ancoraCtx: toc.ancoraCtx, ancoraPos: toc.ancoraPos, vel: toc.vel, idx: toc.idx, ctxT: ctx ? ctx.currentTime : 0, agora: API.agora() }; },
     musicaAtual() { return toc.musica ? toc.musica.id : null; },
 
     // Posição da música (s) como está sendo OUVIDA agora (desconta a latência).
@@ -772,6 +772,14 @@ const Sound = (() => {
       }
     },
   };
+
+  // Destrava o áudio no iOS tocando um buffer mudo (precisa ser dentro de um toque).
+  function destravar() {
+    try {
+      const b = ctx.createBuffer(1, 1, 22050), s = ctx.createBufferSource();
+      s.buffer = b; s.connect(ctx.destination); s.start(0);
+    } catch (e) { /* ok */ }
+  }
 
   // Bip com onda de pulso (duty>0), triangular ou outra. Desliza de f0 a f1.
   function bip(t, duty, f0, f1, dur, vol, tipo, arp) {

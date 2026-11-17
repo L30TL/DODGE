@@ -535,7 +535,7 @@ const Patterns = (() => {
       case BALA: {
         if (s.av === 'faixa') {
           const d = s.r * 2;
-          ctx.globalAlpha = (forte ? 0.22 : 0.1) * (0.6 + 0.4 * prog);
+          ctx.globalAlpha = (forte ? 0.32 : 0.16) * (0.6 + 0.4 * prog);
           ctx.fillStyle = PAL.perigo;
           if (s.vy !== 0) ctx.fillRect(Math.round(s.x - s.r), -hh, d, hh * 2);
           else ctx.fillRect(-hw, Math.round(s.y - s.r), hw * 2, d);
@@ -577,7 +577,7 @@ const Patterns = (() => {
           else if (vertical) ctx.fillRect(Math.round(a), -hh, Math.round(b - a), hh * 2);
           else ctx.fillRect(-hw, Math.round(a), hw * 2, Math.round(b - a));
         }
-        draw(s.p0, (forte ? 0.2 : 0.1) * (0.5 + 0.5 * prog));
+        draw(s.p0, (forte ? 0.3 : 0.15) * (0.5 + 0.5 * prog));
         ctx.globalAlpha = 1;
         ctx.fillStyle = final ? PAL.branco : (pisca ? PAL.perigoClaro : PAL.perigo);
         if (forte || prog > 0.5) {
