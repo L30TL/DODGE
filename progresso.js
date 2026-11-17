@@ -121,7 +121,7 @@ const Progresso = (() => {
     const st = d.stats;
     const valores = {};                                  // quanto cada tipo de missão andou
     switch (ev.tipo) {
-      case 'raspao': valores.raspao = 1; break;
+      case 'raspao': valores.raspao = ev.n || 1; break;
       case 'combo': st.comboMax = Math.max(st.comboMax, ev.n || 0); valores.combo = ev.n || 0; break;
       case 'tentativa': valores.tentativa = 1; break;
       case 'tempo': st.segundosJogados += ev.n || 0; valores.tempo = (ev.n || 0) / 60; break;

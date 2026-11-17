@@ -62,9 +62,13 @@ async function novaPagina(browser, init) {
   {
     const ctx = await browser.newContext();
     const page = await ctx.newPage();
-    await page.goto(URL);
-    await page.evaluate(() => localStorage.setItem('dodge.save', '{"fases":{"despertar":{"melhor":87,"tentativas":143'));   // JSON cortado
-    await page.reload(); await page.waitForTimeout(300);
+    // o save já está estragado no disco quando o jogo abre (antes dos scripts do jogo rodarem)
+    await page.addInitScript(() => {
+      if (sessionStorage.getItem('p3')) return;
+      sessionStorage.setItem('p3', '1');
+      localStorage.setItem('dodge.save', '{"fases":{"despertar":{"melhor":87,"tentativas":143');   // JSON cortado
+    });
+    await page.goto(URL); await page.waitForTimeout(300);
     await page.mouse.click(480, 270); await page.waitForTimeout(1200);
     await page.evaluate(() => Save.gravar());
     const r = await page.evaluate(() => ({ copias: Object.keys(localStorage).filter(k => k.startsWith('dodge.save.corrompido.')).map(k => localStorage.getItem(k)), rec: Save.recuperado, disponivel: Save.disponivel }));

@@ -148,6 +148,7 @@ const Game = (() => {
     corrida: null,           // Sim.Corrida da fase atual (a lógica pura)
     teste: null,             // testando uma fase do editor: { reg, vitoria } — nada vai pro save
     moedasGanhas: 0,         // moedas comuns ganhas nesta tentativa
+    raspoesPendentes: 0, comboPendente: 0,   // raspões ainda não somados na progressão
     tempoJogado: 0,          // s jogados ainda não somados na progressão
     inicio: 0,               // de onde cada tentativa começa (s): 0, ou o ponto escolhido no editor
     audioParado: 0, avisoAudio: false, recomecarAoContinuar: false,
@@ -376,7 +377,9 @@ const Game = (() => {
 
   // Tempo jogado entra na progressão de tempos em tempos (e ao morrer/vencer).
   function somarTempo(agora) {
-    if (!contaProgresso()) { J.tempoJogado = 0; return; }
+    if (!contaProgresso()) { J.tempoJogado = 0; J.raspoesPendentes = 0; J.comboPendente = 0; return; }
+    if (J.raspoesPendentes && (agora || frame % 30 === 0)) { progresso({ tipo: 'raspao', n: J.raspoesPendentes }); J.raspoesPendentes = 0; }
+    if (J.comboPendente > 1 && (agora || frame % 30 === 0)) { progresso({ tipo: 'combo', n: J.comboPendente }); J.comboPendente = 0; }
     if (J.tempoJogado >= CONFIG.economia.tempoLote || (agora && J.tempoJogado >= 1)) {
       const n = Math.floor(J.tempoJogado);
       J.tempoJogado -= n;
@@ -390,8 +393,8 @@ const Game = (() => {
     J.combo = tempo - J.ultimoRaspao < CONFIG.raspao.janelaCombo ? J.combo + 1 : 1;
     if (contaProgresso()) {
       ganharMoedas(CONFIG.economia.raspao);
-      progresso({ tipo: 'raspao' });
-      if (J.combo > 1) progresso({ tipo: 'combo', n: J.combo });
+      J.raspoesPendentes++;                       // entram na progressão em lote (somarTempo)
+      if (J.combo > J.comboPendente) J.comboPendente = J.combo;
     }
     J.ultimoRaspao = tempo;
     alma.susto = 0.25;
@@ -953,10 +956,12 @@ const Game = (() => {
     Save.instalar();
     Criadas.carregar();
     Criadas.instalar();
-    // missões de hoje e conquistas do que já foi feito antes (save antigo)
+    // missões de hoje e conquistas do que já foi feito antes (save antigo); grava só se mudou
+    const diaAntes = Save.dados.missoes.dia + Save.dados.missoes.semana;
     Progresso.atualizarMissoes(Save.dados, Date.now());
-    for (const cq of Progresso.conferirConquistas(Save.dados, Date.now())) notificar(t('conquistaNova', { nome: t('conquistas.' + cq.id + '.nome') }), PAL.ouro);
-    Save.gravarDepois();
+    const novas = Progresso.conferirConquistas(Save.dados, Date.now());
+    for (const cq of novas) notificar(t('conquistaNova', { nome: t('conquistas.' + cq.id + '.nome') }), PAL.ouro);
+    if (novas.length || diaAntes !== Save.dados.missoes.dia + Save.dados.missoes.semana) Save.gravarDepois();
     Input.init(canvas);
     Input.destino = (e) => {
       if (e.t === 'down' || e.t === 'up' || e.t === 'tecla') Sound.iniciar();   // iOS só libera áudio em alguns eventos
