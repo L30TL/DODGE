@@ -18,10 +18,49 @@ function desenharCarteira(c, xDireita, y) {
   c.drawImage(Sprites.desenho('moedinha', PAL.cinza), xDireita - 7, y);
 }
 
+// Nick com efeito (centralizado em x). Letra por letra: cada efeito pinta de um jeito.
+const ARCO = ['#ff4d4d', '#ff9f43', '#ffd23f', '#3ddc84', '#4df3ff', '#4d7cff', '#c04dff'];
+function desenharNick(c, nick, x, y, efeito, corBase, escala) {
+  escala = escala || 1;
+  const txt = String(nick || '').toUpperCase(), tm = Game.tempo;
+  let px = Math.round(x - UI.largura(txt, escala) / 2);
+  for (let i = 0; i < txt.length; i++) {
+    const ch = txt[i];
+    let cor = PAL.branco, dy = 0;
+    if (efeito === 'cor') cor = corBase;
+    else if (efeito === 'degrade') cor = Avatar.ajustar(corBase, 0.55 + 0.9 * i / Math.max(1, txt.length - 1));
+    else if (efeito === 'onda') { cor = corBase; dy = Math.round(Math.sin(tm * 6 + i * 0.7) * escala); }
+    else if (efeito === 'brilho') cor = Math.floor(tm * 10) % (txt.length + 6) === i ? PAL.ouro : PAL.branco;
+    else if (efeito === 'arcoiris') cor = ARCO[(i + Math.floor(tm * 8)) % ARCO.length];
+    else if (efeito === 'faiscas') cor = PAL.ouro;
+    UI.texto(c, ch, px, y + dy, { cor, escala, sombra: PAL.preto });
+    if (efeito === 'faiscas' && ((i * 7 + Math.floor(tm * 12)) % 9) === 0) {
+      c.fillStyle = PAL.branco; c.fillRect(px + 2 * escala, y - 3 * escala, escala, escala);
+    }
+    px += UI.largura(ch, escala) + escala;
+  }
+}
+// Moldura do cartão (r = retângulo).
+function desenharMoldura(c, id, x, y, w, h) {
+  if (!id) return;
+  const cor = { bronze: '#c08040', prata: '#c8d0e0', ouro: PAL.ouro }[id];
+  const borda = (cc, e) => { c.fillStyle = cc; c.fillRect(x, y, w, e); c.fillRect(x, y + h - e, w, e); c.fillRect(x, y, e, h); c.fillRect(x + w - e, y, e, h); };
+  if (cor) { borda(cor, 2); c.fillStyle = PAL.branco; for (const [a, b] of [[x, y], [x + w - 3, y], [x, y + h - 3], [x + w - 3, y + h - 3]]) c.fillRect(a, b, 3, 3); return; }
+  if (id === 'arcoiris') { for (let i = 0; i < 2; i++) borda(ARCO[(Math.floor(Game.tempo * 6) + i) % ARCO.length], 2 - i); return; }
+  if (id === 'fogo') {
+    borda('#ff4d4d', 2);
+    for (let k = 0; k < w; k += 4) {
+      const h1 = 2 + ((k * 13 + Math.floor(Game.tempo * 14)) % 4);
+      c.fillStyle = k % 8 ? '#ff9f43' : '#ffd23f';
+      c.fillRect(x + k, y - h1, 2, h1);
+    }
+  }
+}
+
 // ---------------------------------------------------------------- VISUAL ----
 UI.telas.visual = (() => {
   const C = new Controles();
-  let cat = 'corpo', sel = null, prova = null, aviso = null, avisoT = -9, voltar = 'fases';
+  let cat = 'corpo', sel = null, prova = null, aviso = null, avisoT = -9, voltar = 'fases', modo = 'alma';
   const nomePeca = (id) => t('pecas.' + id);
   const tem = (id) => !!Save.dados.pecas[id];
   const pecasDe = (k) => Object.keys(Avatar.PECAS).filter(id => Avatar.PECAS[id].tipo === k);
@@ -74,6 +113,9 @@ UI.telas.visual = (() => {
     C.limpar();
     const ic = (n, cor) => Sprites.desenho(n, cor || PAL.branco);
     C.botao({ x: 4, y: 6, w: 20, h: 16, icone: ic('setaEsq'), acao: () => { Sound.sfx('voltar'); Game.irPara(voltar); } });
+    C.botao({ x: 108, y: 6, w: 44, h: 16, texto: t('alma'), primario: modo === 'alma', cor: PAL.alma, acao: () => { modo = 'alma'; montar(); } });
+    C.botao({ x: 156, y: 6, w: 52, h: 16, texto: t('perfil'), primario: modo === 'perfil', cor: PAL.alma, acao: () => { modo = 'perfil'; montar(); } });
+    if (modo === 'perfil') { montarPerfil(ic); return; }
     // categorias
     Avatar.CATEGORIAS.forEach((k, i) => {
       C.botao({ x: 178 + i * 42, y: 28, w: 40, h: 14, texto: t('categorias.' + k).slice(0, 6), primario: k === cat, cor: PAL.alma,
@@ -95,6 +137,58 @@ UI.telas.visual = (() => {
       C.botao({ x: 20, y: 236, w: 136, h: 18, texto: t('comprar') + ' ' + p.preco, icone: ic('moedinha', PAL.preto), primario: true,
         cor: Save.dados.moedas >= p.preco ? PAL.ouro : PAL.cinza, acao: comprar });
     }
+  }
+
+  // PERFIL: nick, efeito do nick, emblema (conquistas) e moldura.
+  function montarPerfil(ic) {
+    const pf = Save.dados.perfil, d = Save.dados;
+    C.botao({ x: 404, y: 30, w: 68, h: 16, texto: t('editor.editar'), icone: ic('lapis'), acao: () => {
+      EntradaTexto.pedir({ titulo: t('seuNick'), valor: pf.nick, max: 16, aoConfirmar: (txt) => {
+        if (Filtro.temPalavrao(txt)) { mostrar(t('nickProibido')); Sound.sfx('voltar'); return; }
+        pf.nick = txt; Save.gravar(); montar();
+      } });
+    } });
+    Progresso.EFEITOS.forEach((e, i) => {
+      const livre = Progresso.efeitoLiberado(d, e.id);
+      C.botao({ x: 178 + (i % 4) * 74, y: 64 + Math.floor(i / 4) * 24, w: 70, h: 20, texto: '', primario: pf.efeito === e.id, cor: PAL.ouro,
+        _efeito: e.id, acao: () => {
+          if (livre) { pf.efeito = e.id; Save.gravarDepois(); Sound.sfx('menu'); montar(); return; }
+          if (!e.preco) { mostrar(t('liberaCom') + ': ' + t('conquistas.' + e.conquista + '.nome')); return; }
+          const r = Progresso.comprar(d, 'nick.' + e.id, { preco: e.preco });
+          if (r === 'ok') { pf.efeito = e.id; Sound.sfx('moeda'); mostrar(t('comprou')); Game.progresso({ tipo: 'comprou' }); Save.gravar(); }
+          else { Sound.sfx('voltar'); mostrar(t('faltamMoedas', { n: e.preco - d.moedas })); }
+          montar();
+        } });
+    });
+    const emblemas = [''].concat(Progresso.CONQUISTAS.filter(cq => d.conquistas[cq.id]).map(cq => cq.id));
+    emblemas.forEach((id, i) => {
+      C.botao({ x: 178 + (i % 9) * 32, y: 130 + Math.floor(i / 9) * 22, w: 30, h: 20, texto: id ? '' : '-', primario: pf.emblema === id, cor: PAL.ouro,
+        _emblema: id, acao: () => { pf.emblema = id; Save.gravarDepois(); if (id) mostrar(t('conquistas.' + id + '.nome')); montar(); } });
+    });
+    [''].concat(Progresso.MOLDURAS.map(m => m.id)).forEach((id, i) => {
+      const livre = !id || Progresso.molduraLiberada(d, id);
+      C.botao({ x: 178 + i * 49, y: 206, w: 46, h: 20, texto: id ? t('molduras.' + id).slice(0, 7) : '-', primario: pf.moldura === id, cor: PAL.ouro,
+        desabilitado: !livre, acao: () => { pf.moldura = id; Save.gravarDepois(); montar(); } });
+    });
+  }
+
+  function desenharPerfil(c) {
+    const pf = Save.dados.perfil;
+    UI.texto(c, t('nick'), 180, 34, { cor: PAL.cinzaClaro });
+    UI.texto(c, pf.nick || t('semNick'), 214, 34, { cor: pf.nick ? PAL.branco : PAL.cinza });
+    UI.texto(c, t('efeitoNick'), 180, 54, { cor: PAL.cinzaClaro });
+    UI.texto(c, t('emblema'), 180, 120, { cor: PAL.cinzaClaro });
+    UI.texto(c, t('moldura'), 180, 196, { cor: PAL.cinzaClaro });
+    for (const b of C.itens) {
+      if (b._efeito) {
+        const e = Progresso.EFEITOS.find(x => x.id === b._efeito), livre = Progresso.efeitoLiberado(Save.dados, e.id);
+        desenharNick(c, t('efeitos.' + e.id), b.x + b.w / 2, b.y + 4, e.id, Avatar.corPrincipal(prova));
+        if (!livre && e.preco) UI.texto(c, String(e.preco), b.x + b.w / 2, b.y + 12, { alinhar: 'centro', cor: Save.dados.moedas >= e.preco ? PAL.ouro : PAL.cinza });
+        if (!livre && !e.preco) c.drawImage(Sprites.desenho('cadeado', PAL.cinzaClaro), b.x + b.w / 2 - 3, b.y + 11);
+      } else if (b._emblema) c.drawImage(Sprites.desenho('trofeu', Save.dados.perfil.emblema === b._emblema ? PAL.preto : PAL.ouro), b.x + 11, b.y + 6);
+    }
+    const m = Progresso.MOLDURAS.find(x => !Progresso.molduraLiberada(Save.dados, x.id));
+    if (m) UI.texto(c, t('molduras.' + m.id) + ': ' + t('moldurasComo.' + m.id), 180, 232, { cor: PAL.cinza });
   }
 
   return {
@@ -124,6 +218,10 @@ UI.telas.visual = (() => {
       UI.texto(c, t('pecasColecao', { n: donas, total: Object.keys(Avatar.PECAS).length }), 380, 11, { alinhar: 'direita', cor: PAL.cinzaClaro, sombra: PAL.preto });
       // a alma grande (com a peça de prova)
       UI.painel(c, 10, 28, 156, 204, { fundo: PAL.fundo2, borda: PAL.fundo3 });
+      const pf = Save.dados.perfil;
+      desenharMoldura(c, pf.moldura, 10, 28, 156, 204);
+      if (pf.nick) desenharNick(c, pf.nick, 88 + (pf.emblema ? 6 : 0), 38, pf.efeito, Avatar.corPrincipal(prova));
+      if (pf.nick && pf.emblema) c.drawImage(Sprites.desenho('trofeu', PAL.ouro), 88 - UI.largura(pf.nick) / 2 - 6, 38);
       const pulo = Math.round(Math.abs(Math.sin(tm * 2.4)) * 4);
       c.fillStyle = PAL.preto; c.globalAlpha = 0.35; c.fillRect(58, 150, 60, 4); c.globalAlpha = 1;
       Avatar.desenhar(c, prova, 88, 104 - pulo, 7, { expressao: (tm % 3.7) < 0.12 ? 'piscando' : 'normal' });
@@ -136,6 +234,11 @@ UI.telas.visual = (() => {
         if (st) UI.texto(c, st, 88, 186, { alinhar: 'centro', cor });
       }
       C.desenhar(c, tm);
+      if (modo === 'perfil') {
+        desenharPerfil(c);
+        if (aviso && tm - avisoT < 2.2) UI.texto(c, aviso, 324, 250, { alinhar: 'centro', cor: PAL.ouro, sombra: PAL.preto });
+        return;
+      }
       // miniaturas das peças por cima dos botões
       for (const b of C.itens) {
         if (b._peca) {

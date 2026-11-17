@@ -180,6 +180,31 @@ const Progresso = (() => {
     return 'ok';
   }
 
-  return { CONQUISTAS, DIARIAS, SEMANAIS, atualizarMissoes, registrar, resgatar, conferirConquistas, ganhar,
+  // ------------------------------------------------------------ perfil ---
+  // Efeitos do nick (comprados com moedas; um vem de conquista), molduras (marcos do jogo)
+  // e emblemas (cada conquista liberada vira um emblema).
+  const EFEITOS = [
+    { id: 'nenhum', preco: 0 }, { id: 'cor', preco: 40 }, { id: 'degrade', preco: 80 }, { id: 'onda', preco: 100 },
+    { id: 'brilho', preco: 120 }, { id: 'arcoiris', preco: 200 }, { id: 'faiscas', conquista: 'combo5' },
+  ];
+  const vitorias = (d) => Object.values(fasesDe(d)).filter(f => f.vitorias > 0).length;
+  const MOLDURAS = [
+    { id: 'bronze', teste: (d) => vitorias(d) >= 1 },
+    { id: 'prata', teste: (d) => vitorias(d) >= 3 },
+    { id: 'ouro', teste: (d) => comTres(d) },
+    { id: 'arcoiris', teste: (d) => d.stats.missoesFeitas >= 10 },
+    { id: 'fogo', teste: (d) => Object.keys(fasesDe(d)).some(id => fasesDe(d)[id].vitorias > 0 &&
+      typeof Levels !== 'undefined' && (Levels.porId(id) || {}).dificuldade === 'demonio') },
+  ];
+  const efeitoLiberado = (d, id) => {
+    const e = EFEITOS.find(x => x.id === id);
+    return !!e && (e.preco === 0 || !!d.pecas['nick.' + id] || (e.conquista && !!d.conquistas[e.conquista]));
+  };
+  const molduraLiberada = (d, id) => { const m = MOLDURAS.find(x => x.id === id); return !!m && m.teste(d); };
+
+  // Demons só abrem com estrelas suficientes (estrela vem das fases oficiais vencidas).
+  const demonTravado = (fase, estrelas) => !!fase && fase.dificuldade === 'demonio' && !fase.criada && estrelas < CONFIG.progressao.estrelasDemon;
+
+  return { EFEITOS, MOLDURAS, efeitoLiberado, molduraLiberada, demonTravado, CONQUISTAS, DIARIAS, SEMANAIS, atualizarMissoes, registrar, resgatar, conferirConquistas, ganhar,
     doRecorde, daVitoria, comprar, diaDe, semanaDe, fimDoDia, fimDaSemana, secretas };
 })();

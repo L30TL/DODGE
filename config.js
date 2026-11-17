@@ -138,6 +138,7 @@ const CONFIG = {
   // ----------------------------------------------------------- progressão ----
   progressao: {
     avisoS: 2.6,            // s — quanto tempo o aviso de conquista/missão fica no topo
+    estrelasDemon: 20,      // estrelas pra abrir as fases Demônio
   },
 
   // ------------------------------------------------------------ economia -----

@@ -46,8 +46,8 @@ const Sim = (() => {
       this.reiniciar(0);
     }
 
-    // Começa (ou recomeça) no tempo t0 com a alma no centro.
-    reiniciar(t0) {
+    // Começa (ou recomeça) no tempo t0 com a alma no centro (ou em x, y: checkpoint do treino).
+    reiniciar(t0, x, y) {
       t0 = finito(t0) ? clamp(t0, 0, this.c.duracao) : 0;
       this.t = t0;
       this.estado = 'jogando';           // jogando | morto | vitoria
@@ -55,9 +55,11 @@ const Sim = (() => {
       this.moedas = [false, false, false];
       this.raspoes = 0;
       const a = this.alma;
-      a.x = 0; a.y = 0; a.vx = 0; a.vy = 0;
+      a.vx = 0; a.vy = 0;
       this.eventos.length = 0;
       this.atualizarCaixa(t0);
+      a.x = finito(x) ? clamp(x, -this.lim.x, this.lim.x) : 0;
+      a.y = finito(y) ? clamp(y, -this.lim.y, this.lim.y) : 0;
       this.at.reiniciar(t0, a);
     }
 

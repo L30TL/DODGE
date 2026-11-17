@@ -20,7 +20,9 @@ test('save v2 → v3: quem já jogava ganha as moedas do que já fez, e nada se 
     stats: { tentativas: 42, raspoes: 200, mortes: 40, vitorias: 1 } };
   const { S } = mundo({ 'dodge.save': JSON.stringify(v2) });
   const d = S.dados;
-  assert.strictEqual(d.versao, 3);
+  assert.strictEqual(d.versao, 4);
+  assert.strictEqual(d.perfil.nick, '');
+  assert.strictEqual(d.infinito.melhor, 0);
   assert.strictEqual(d.moedas, 100 + 40 + 45 + 200);              // fase criada (u-x) não conta
   assert.strictEqual(d.fases.despertar.tentativas, 12);
   assert.strictEqual(d.fases.despertar.moedas[0], true);
@@ -97,7 +99,7 @@ test('loja: compra com moedas; sem moedas, travada ou repetida não compra', () 
 });
 
 test('save v3 com lixo nos campos novos: limpa sem perder o resto', () => {
-  const lixo = { versao: 3, moedas: -50, moedasTotal: 'x', pecas: { 'corpo.quadrado': true, 'x': 'sim' }, conquistas: { a: 'b', prensa: 5 },
+  const lixo = { versao: 3, perfil: { nick: 7, efeito: {} }, infinito: { melhor: 'x' }, moedas: -50, moedasTotal: 'x', pecas: { 'corpo.quadrado': true, 'x': 'sim' }, conquistas: { a: 'b', prensa: 5 },
     missoes: { dia: 99, diarias: [null, { id: 'raspoes', alvo: -3, prog: NaN }] }, avatar: [{ peca: 'corpo.redondo', cor: 'red' }, { peca: 'olhos.ponto', cor: '#00FF00' }],
     fases: { despertar: { melhor: 50 } } };
   const { S } = mundo({ 'dodge.save': JSON.stringify(lixo) });
@@ -110,4 +112,27 @@ test('save v3 com lixo nos campos novos: limpa sem perder o resto', () => {
   assert.strictEqual(d.missoes.diarias[0].alvo, 1);
   assert.strictEqual(json(d.avatar), json([{ peca: 'olhos.ponto', cor: '#00ff00' }]));
   assert.strictEqual(d.fases.despertar.melhor, 50);
+  assert.strictEqual(d.perfil.nick, '');
+  assert.strictEqual(d.perfil.efeito, 'nenhum');
+  assert.strictEqual(d.infinito.melhor, 0);
+});
+
+test('Demons abrem com estrelas; fase criada e outras dificuldades nunca travam', () => {
+  const { P, CONFIG } = mundo();
+  const n = CONFIG.progressao.estrelasDemon;
+  assert.ok(P.demonTravado({ dificuldade: 'demonio' }, n - 1));
+  assert.ok(!P.demonTravado({ dificuldade: 'demonio' }, n));
+  assert.ok(!P.demonTravado({ dificuldade: 'insano' }, 0));
+  assert.ok(!P.demonTravado({ dificuldade: 'demonio', criada: true }, 0));
+});
+
+test('treino: recomeça do checkpoint com a alma onde estava', () => {
+  const m = carregar(ARQ);
+  const r = new m.Sim.Corrida(m.Patterns.compilar({ id: 't', bpm: 120, duracaoBatidas: 40, eventos: [] }, m.CONFIG.caixa));
+  r.reiniciar(7.5, 40, -30);
+  assert.strictEqual(r.t, 7.5);
+  assert.deepStrictEqual([r.alma.x, r.alma.y], [40, -30].map(Number));
+  r.reiniciar(1, 9999, NaN);                                      // fora da caixa / lixo: fica dentro
+  assert.strictEqual(r.alma.x, r.lim.x);
+  assert.strictEqual(r.alma.y, 0);
 });

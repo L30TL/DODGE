@@ -16,7 +16,7 @@ const Save = (() => {
   const CHAVE_V1 = 'dodge.save.v1';           // formato da Fase 1 (não é apagado: vira backup)
   const CHAVE_BACKUP = 'dodge.save.backup';
   const PREFIXO_CORROMPIDO = 'dodge.save.corrompido.';
-  const VERSAO = 3;
+  const VERSAO = 4;
   let gravarPendente = null;
   let ultimoBackup = 0;
   const finito = Number.isFinite;
@@ -34,6 +34,7 @@ const Save = (() => {
         reduzirEfeitos: false,
         pausaAuto: true,
         sensibilidadeToque: CONFIG.toque.sensibilidadePadrao,
+        idioma: null,         // null = o do navegador ('pt' ou 'en')
       },
       fases: {},              // por id de fase: veja Save.fase()
       stats: { tentativas: 0, raspoes: 0, mortes: 0, vitorias: 0, segundosJogados: 0,
@@ -45,6 +46,9 @@ const Save = (() => {
       pecas: pecasIniciais(), // peças de visual que a pessoa tem: { id: true }
       conquistas: {},         // { id: quando foi liberada (ms) }
       missoes: { dia: '', diarias: [], semana: '', semanais: [] },
+      // v4: perfil local (o nick é o único dado pessoal) e modo infinito
+      perfil: { nick: '', efeito: 'nenhum', emblema: '', moldura: '' },
+      infinito: { melhor: 0, partidas: 0 },   // melhor tempo (s) e quantas partidas
     };
   }
   function pecasIniciais() {
@@ -83,6 +87,8 @@ const Save = (() => {
       d.versao = 3;
       return d;
     },
+    // v3 → v4: perfil local e modo infinito (campos novos começam vazios; nada muda no resto)
+    3: (d) => { d.perfil = { nick: '', efeito: 'nenhum', emblema: '', moldura: '' }; d.infinito = { melhor: 0, partidas: 0 }; d.versao = 4; return d; },
   };
 
   function migrar(d) {
@@ -123,6 +129,12 @@ const Save = (() => {
     out.config.reduzirEfeitos = c.reduzirEfeitos === true;
     out.config.pausaAuto = c.pausaAuto !== false;
     out.config.sensibilidadeToque = finito(c.sensibilidadeToque) ? Math.max(0.5, Math.min(2.5, c.sensibilidadeToque)) : out.config.sensibilidadeToque;
+    out.config.idioma = c.idioma === 'pt' || c.idioma === 'en' ? c.idioma : null;
+    const pf = dados.perfil || {};
+    const curto = (v, n) => (typeof v === 'string' ? v.slice(0, n) : '');
+    out.perfil = { nick: curto(pf.nick, 16), efeito: curto(pf.efeito, 20) || 'nenhum', emblema: curto(pf.emblema, 30), moldura: curto(pf.moldura, 30) };
+    const inf = dados.infinito || {};
+    out.infinito = { melhor: finito(inf.melhor) ? Math.max(0, Math.min(1e6, inf.melhor)) : 0, partidas: inteiro(inf.partidas, 0, 1e9, 0) };
     const st = dados.stats || {};
     for (const k in out.stats) out.stats[k] = inteiro(st[k], 0, 1e12, 0);
     for (const id in (dados.fases || {})) {
@@ -152,6 +164,8 @@ const Save = (() => {
       for (const k in (x.conquistas || {})) if (!out.conquistas[k] || x.conquistas[k] < out.conquistas[k]) out.conquistas[k] = x.conquistas[k];
     }
     out.moedasTotal = Math.max(a.moedasTotal || 0, b.moedasTotal || 0);
+    out.infinito.melhor = Math.max((a.infinito || {}).melhor || 0, (b.infinito || {}).melhor || 0);
+    out.infinito.partidas = Math.max((a.infinito || {}).partidas || 0, (b.infinito || {}).partidas || 0);
     const ids = new Set(Object.keys(a.fases).concat(Object.keys(b.fases)));
     for (const id of ids) {
       const fa = a.fases[id] || novaFase(), fb = b.fases[id] || novaFase();

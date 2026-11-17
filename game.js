@@ -187,8 +187,9 @@ const Game = (() => {
     J.trapaca = false;
     J.textoMorte = null;
     if (!J.teste) Save.dados.ultimaFase = fase.id;
+    J.treinoCps = [];
     const reg = regAtual();
-    J.dica.ativa = !J.teste && Save.dados.primeiraVez && Levels.indice(fase.id) === 0 && reg.tentativas < 3;
+    J.dica.ativa = !semSave() && Save.dados.primeiraVez && Levels.indice(fase.id) === 0 && reg.tentativas < 3;
     J.dica.movido = 0;
   }
 
@@ -232,14 +233,28 @@ const Game = (() => {
     return r;
   }
   // Moedas e missões só nas fases oficiais, sem debug e fora do teste do editor.
-  const contaProgresso = () => !J.teste && J.fase && !J.fase.criada && !J.fase.debug && !J.trapaca;
+  const contaProgresso = () => !semSave() && J.fase && !J.fase.criada && !J.fase.debug && !J.trapaca;
   function ganharMoedas(n) {
     if (!contaProgresso() || !(n > 0)) return;
     J.moedasGanhas += Progresso.ganhar(Save.dados, n);
   }
 
   // Registro da fase no save. No teste do editor é um de mentira: nada é salvo.
-  function regAtual() { return J.teste ? J.teste.reg : Save.fase(J.fase.id); }
+  // Teste do editor e treino não mexem no save: usam um registro de mentira.
+  const semSave = () => !!(J.teste || J.treino);
+  function regAtual() { return J.teste ? J.teste.reg : J.treino ? J.treino.reg : Save.fase(J.fase.id); }
+  const regFalso = () => ({ melhor: 0, tentativas: 0, vitorias: 0, moedas: [false, false, false] });
+
+  // Treino: marca um checkpoint (tempo + onde a alma está); cada morte recomeça do último.
+  function checkpoint(tirar) {
+    if (!J.treino || J.estado !== 'jogando') return;
+    const L = J.treino.cps;
+    if (tirar) L.pop(); else L.push({ t: J.t, x: alma.x, y: alma.y });
+    const u = L[L.length - 1];
+    J.inicio = u ? u.t : 0; J.inicioX = u ? u.x : 0; J.inicioY = u ? u.y : 0;
+    Sound.sfx(tirar ? 'voltar' : 'moeda');
+    Flutuantes.add(t(tirar ? 'checkpointTirado' : 'checkpoint'), CX, CY - HH - 10, tirar ? PAL.cinzaClaro : PAL.verde, 0.8, 1);
+  }
 
   function aoEventoAtaque(o) {
     const s = o.s;
@@ -256,7 +271,7 @@ const Game = (() => {
   function comecarTentativa(desdeT) {
     const reg = regAtual();
     reg.tentativas++;
-    if (!J.teste) { Save.dados.stats.tentativas++; Save.gravarDepois(); }
+    if (!semSave()) { Save.dados.stats.tentativas++; Save.gravarDepois(); }
     J.tentativa = reg.tentativas;
     J.melhorAntes = reg.melhor;
     J.passouMelhor = false;
@@ -268,7 +283,10 @@ const Game = (() => {
     alma.x = 0; alma.y = 0; alma.vx = 0; alma.vy = 0; alma.susto = 0;
     for (const r of alma.rastro) { r.x = 0; r.y = 0; }
     pega.reancorar = true;
-    J.corrida.reiniciar(desdeT !== undefined ? desdeT : J.inicio);
+    if (desdeT !== undefined) J.corrida.reiniciar(desdeT);
+    else J.corrida.reiniciar(J.inicio, J.inicioX, J.inicioY);
+    alma.x = J.corrida.alma.x; alma.y = J.corrida.alma.y;
+    for (const r of alma.rastro) { r.x = alma.x; r.y = alma.y; }
     J.t = J.corrida.t;
     J.prog = J.corrida.prog;
     Sound.tocar(J.fase.musica, { desde: J.t, vel: Debug.vel });
@@ -389,7 +407,7 @@ const Game = (() => {
 
   function raspar(o) {
     J.raspoes++;
-    if (!J.teste) Save.dados.stats.raspoes++;
+    if (!semSave()) Save.dados.stats.raspoes++;
     J.combo = tempo - J.ultimoRaspao < CONFIG.raspao.janelaCombo ? J.combo + 1 : 1;
     if (contaProgresso()) {
       ganharMoedas(CONFIG.economia.raspao);
@@ -429,7 +447,7 @@ const Game = (() => {
     const pct = e.pct;
     J.pctMorte = pct;
     const reg = regAtual();
-    if (J.teste) {
+    if (semSave()) {
       J.recorde = false;
       reg.melhor = Math.max(reg.melhor, pct);
     } else {
@@ -456,7 +474,7 @@ const Game = (() => {
         Math.sin(a) * v + (Math.random() - 0.5) * 40, 0.5 + Math.random() * 0.5, p.cor, 1, 120, 1.2);
     }
     Particulas.explosao(mx, my, 10, cor, 160, 0.4);
-    if (Debug.ativo && !J.teste) Debug.aoMorrer(pct);
+    if (Debug.ativo && !semSave()) Debug.aoMorrer(pct);
   }
 
   function vencer() {
@@ -468,6 +486,8 @@ const Game = (() => {
       J.ganhouEstrelas = 0;
       J.teste.reg.vitorias++;
       J.teste.vitoria = { doInicio: J.inicio === 0 && !J.trapaca, tentativas: J.teste.reg.tentativas, moedas: Array.from(J.corrida.moedas) };
+    } else if (J.treino) {
+      J.ganhouEstrelas = 0;
     } else {
       const reg = Save.fase(J.fase.id);
       // fase criada não dá estrela (estrela é das oficiais)
@@ -558,8 +578,10 @@ const Game = (() => {
         if (J.estado === 'pausa') montarPausa();
         return;
       }
-      J.teste = args.teste ? { reg: { melhor: 0, tentativas: 0, vitorias: 0, moedas: [false, false, false] }, vitoria: null } : null;
+      J.teste = args.teste ? { reg: regFalso(), vitoria: null } : null;
+      J.treino = args.treino ? { reg: regFalso(), cps: [] } : null;
       J.inicio = args.teste ? Math.max(0, args.desde || 0) : 0;
+      J.inicioX = 0; J.inicioY = 0;
       preparar(args.fase);
       J.controles.limpar();
       if (args.desde) J.trapaca = true;
@@ -572,7 +594,10 @@ const Game = (() => {
         if (e.t === 'tecla' && !e.repetida) {
           if (e.k === 'voltar' || e.k === 'pausa') pausar();
           else if (e.k === 'reiniciar') { Sound.parar(); comecarTentativa(); }
+          else if (e.code === 'KeyC') checkpoint(false);
+          else if (e.code === 'KeyV') checkpoint(true);
         } else if (e.t === 'down' && e.x > W - 34 && e.y < 26) pausar();
+        else if (e.t === 'down' && J.treino && e.x > W - 36 && e.y > H - 36) checkpoint(false);
         return;
       }
       if (J.estado === 'morto') {
@@ -767,6 +792,11 @@ const Game = (() => {
       }
     }
     if (J.teste) UI.texto(c, t('editor.testeTitulo'), 8, H - 11, { cor: PAL.alma, sombra: PAL.preto });
+    if (J.treino) {
+      UI.texto(c, t('treinoDica'), 8, H - 11, { cor: PAL.verde, sombra: PAL.preto });
+      for (const cp of J.treino.cps) { c.fillStyle = PAL.verde; c.fillRect(bx + Math.round(bw * cp.t / J.comp.duracao), by - 3, 1, 10); }
+      if (J.estado === 'jogando') { UI.painel(c, W - 34, H - 34, 28, 26, { fundo: PAL.fundo2, borda: PAL.verde }); c.drawImage(Sprites.desenho('bandeira', PAL.verde), W - 25, H - 26); }
+    }
     // botão de pausa
     if (J.estado === 'jogando' || J.estado === 'morto') {
       const ic = Sprites.desenho('pausa', PAL.cinzaClaro);
@@ -848,7 +878,7 @@ const Game = (() => {
     c.fillStyle = PAL.preto; c.globalAlpha = 0.4;
     c.fillRect(pX + 70 - 18 + Math.round(pulo / 2), 156, 36 - pulo, 3); c.globalAlpha = 1;
     // estrelas
-    const nEst = J.teste || J.fase.criada ? 0 : Levels.estrelasDe(J.fase.dificuldade);
+    const nEst = semSave() || J.fase.criada ? 0 : Levels.estrelasDe(J.fase.dificuldade);
     const sx = pX + 140;
     for (let i = 0; i < nEst; i++) UI.sprite(c, Sprites.estrela(true), sx + i * 16, 78, 2);
     if (J.teste) UI.texto(c, t('editor.venceuTeste'), sx - 6, 81, { cor: PAL.ouro });
@@ -857,7 +887,7 @@ const Game = (() => {
       if (a > 0) { c.globalAlpha = a; UI.texto(c, t('ganhouEstrelas', { n: J.ganhouEstrelas }) + '★', sx + nEst * 16 + 4, 81, { cor: PAL.ouro }); c.globalAlpha = 1; }
     }
     // moedas
-    const moedas = J.teste ? J.corrida.moedas : Save.fase(J.fase.id).moedas;
+    const moedas = semSave() ? J.corrida.moedas : Save.fase(J.fase.id).moedas;
     UI.texto(c, t('vitoriaMoedas'), sx, 106, { cor: PAL.cinzaClaro });
     for (let i = 0; i < 3; i++) UI.sprite(c, Sprites.moeda(moedas[i]), sx + 60 + i * 18, 102, 2);
     UI.texto(c, t('vitoriaTentativas'), sx, 128, { cor: PAL.cinzaClaro });
@@ -865,7 +895,7 @@ const Game = (() => {
     UI.texto(c, t('vitoriaRaspoes'), sx, 144, { cor: PAL.cinzaClaro });
     UI.texto(c, String(J.raspoes), pX + pW - 14, 144, { alinhar: 'direita', cor: PAL.branco });
     if (J.moedasGanhas > 0) UI.texto(c, t('moedasGanhas', { n: J.moedasGanhas }), CX, 162, { alinhar: 'centro', cor: PAL.ouro });
-    if (!J.teste && !J.fase.criada && !Levels.proxima(J.fase.id)) UI.texto(c, t('maisFasesEmBreve'), CX, 176, { alinhar: 'centro', cor: PAL.almaClara });
+    if (!semSave() && !J.fase.criada && !Levels.proxima(J.fase.id)) UI.texto(c, t('maisFasesEmBreve'), CX, 176, { alinhar: 'centro', cor: PAL.almaClara });
     c.restore();
     if (ease >= 1) J.controles.desenhar(c, tempo);
   }
@@ -885,6 +915,8 @@ const Game = (() => {
   function jogar(fase, desde) { irPara('jogo', { fase, desde }); }
   // Teste do editor: começa (e recomeça a cada morte) em `desde` segundos; nada vai pro save.
   function testar(fase, desde) { irPara('jogo', { fase, desde, teste: true }); }
+  // Treino: checkpoints à vontade, nada conta (recorde, moedas, missões, mapa de mortes).
+  function treinar(fase) { irPara('jogo', { fase, treino: true }); }
 
   // ========================================================== LOOP ==========
   function loop(ms) {
@@ -984,7 +1016,7 @@ const Game = (() => {
   }
 
   return {
-    init, irPara, jogar, testar, tremer, flash, desenharFundo, Particulas, notificar, progresso,
+    init, irPara, jogar, testar, treinar, tremer, flash, desenharFundo, Particulas, notificar, progresso,
     get tempo() { return tempo; },
     get frame() { return frame; },
     get nomeTela() { return nomeTela; },

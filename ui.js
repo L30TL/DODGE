@@ -73,6 +73,25 @@ const TEXTOS = {
     vitoriaRaspoes: 'RASPÕES',
     vitoriaMoedas: 'MOEDAS',
     // ------------------------------------------------------- progressão
+    alma: 'ALMA',
+    perfil: 'PERFIL',
+    nick: 'NICK',
+    semNick: 'SEM NICK',
+    seuNick: 'SEU NICK (SÓ LETRAS E NÚMEROS)',
+    nickProibido: 'ESSE NICK NÃO PODE. ESCOLHA OUTRO',
+    efeitoNick: 'EFEITO DO NICK',
+    emblema: 'EMBLEMA',
+    moldura: 'MOLDURA',
+    nenhum: 'NENHUM',
+    nenhuma: 'NENHUMA',
+    efeitos: { nenhum: 'NENHUM', cor: 'COR', degrade: 'DEGRADÊ', onda: 'ONDA', brilho: 'BRILHO', arcoiris: 'ARCO-ÍRIS', faiscas: 'FAÍSCAS' },
+    molduras: { bronze: 'BRONZE', prata: 'PRATA', ouro: 'OURO', arcoiris: 'ARCO-ÍRIS', fogo: 'FOGO' },
+    moldurasComo: { bronze: 'VENÇA 1 FASE', prata: 'VENÇA 3 FASES', ouro: 'AS 3 MOEDAS DE UMA FASE', arcoiris: '10 MISSÕES', fogo: 'VENÇA UM DEMÔNIO' },
+    treino: 'TREINO',
+    treinoDica: 'TREINO · C (OU A BANDEIRA): CHECKPOINT · V: TIRAR',
+    checkpoint: 'CHECKPOINT!',
+    checkpointTirado: 'CHECKPOINT TIRADO',
+    precisaEstrelas: 'PRECISA DE {n}★ (VOCÊ TEM {m})',
     visual: 'VISUAL',
     missoes: 'MISSÕES',
     conquistasTitulo: 'CONQUISTAS {n}/{total}',
@@ -556,6 +575,7 @@ const Sprites = (() => {
     ima: ['##.##', '##.##', '#...#', '#...#', '#...#', '.###.', '.....'],
     compartilhar: ['...#...', '..###..', '.#.#.#.', '...#...', '#..#..#', '#.....#', '#######'],
     trofeu: ['#######', '#.###.#', '.#####.', '..###..', '...#...', '..###..', '.#####.'],
+    bandeira: ['#######', '#.....#', '#######', '#......', '#......', '#......', '#......'],
     moedinha: ['..###..', '.#www#.', '#ww#ww#', '#w#w#w#', '#ww#ww#', '.#www#.', '..###..'],
     cabide: ['...#...', '..#.#..', '....#..', '...#...', '.#####.', '#.....#', '#######'],
     interrogacao: ['.###.', '#...#', '....#', '...#.', '..#..', '.....', '..#..'],
@@ -1030,10 +1050,12 @@ UI.telas.fases = (() => {
     Sound.sfx('menu');
   }
 
-  function jogar() {
+  const travada = (f) => Progresso.demonTravado(f, Save.estrelas(Levels.FASES));
+  function jogar(treino) {
     const f = lista()[idx];
+    if (travada(f) && !Debug.ativo) { Sound.sfx('voltar'); return; }
     Sound.sfx('confirmar');
-    Game.jogar(f);
+    if (treino === true) Game.treinar(f); else Game.jogar(f);
   }
 
   function montar() {
@@ -1043,6 +1065,7 @@ UI.telas.fases = (() => {
     C.botao({ x: 402, y: CART.y + CART.h / 2 - 20, w: 26, h: 40, icone: Sprites.desenho('setaDir', PAL.branco), acao: () => mudar(1) });
     const pri = C.botao({ x: 180, y: 216, w: 120, h: 22, texto: t('jogar'), escala: 2, primario: true, cor: PAL.alma, acao: jogar });
     C.botao({ x: 330, y: 6, w: 64, h: 16, texto: t('criar'), icone: Sprites.desenho('lapis', PAL.branco), acao: () => { Sound.sfx('confirmar'); Game.irPara('criadas'); } });
+    C.botao({ x: 306, y: 218, w: 66, h: 20, texto: t('treino'), icone: Sprites.desenho('bandeira', PAL.verde), acao: () => jogar(true) });
     C.botao({ x: 14, y: 218, w: 80, h: 20, texto: t('visual'), icone: Sprites.desenho('cabide', PAL.branco), acao: () => { Sound.sfx('confirmar'); Game.irPara('visual'); } });
     C.botao({ x: 386, y: 218, w: 80, h: 20, texto: t('missoes'), icone: Sprites.desenho('trofeu', PAL.ouro), acao: () => { Sound.sfx('confirmar'); Game.irPara('missoes'); } });
     C.focar(pri);
@@ -1077,6 +1100,11 @@ UI.telas.fases = (() => {
     for (let i = 0; i < 3; i++) UI.sprite(c, Sprites.moeda(reg.moedas[i]), bx + i * 18, y + 122, 2);
     UI.texto(c, t('tentativas', { n: reg.tentativas }), x + CART.w - 16, y + 126, { alinhar: 'direita', cor: PAL.cinzaClaro });
     if (f.debug) UI.texto(c, t('rotuloDebug'), x + CART.w - 16, y + 146, { alinhar: 'direita', cor: PAL.perigo });
+    if (Progresso.demonTravado(f, Save.estrelas(Levels.FASES))) {
+      c.globalAlpha = alpha * 0.8; c.fillStyle = PAL.preto; c.fillRect(x + 1, y + 1, CART.w - 2, CART.h - 2); c.globalAlpha = alpha;
+      UI.sprite(c, Sprites.desenho('cadeado', PAL.branco), x + CART.w / 2 - 10, y + 50, 4);
+      UI.texto(c, t('precisaEstrelas', { n: CONFIG.progressao.estrelasDemon, m: Save.estrelas(Levels.FASES) }), x + CART.w / 2, y + 100, { alinhar: 'centro', cor: PAL.ouro });
+    }
     c.globalAlpha = 1;
   }
 
