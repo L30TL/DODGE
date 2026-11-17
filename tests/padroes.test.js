@@ -109,3 +109,10 @@ test('teleguiada com curva faz o mesmo caminho em qualquer fps (B13)', () => {
     assert.ok(Math.abs(p[0] - a[0]) < 1e-6 && Math.abs(p[1] - a[1]) < 1e-6, `${a} × ${p}`);
   }
 });
+
+test('paredes com centro em lista têm posição de verdade (B21)', () => {
+  const { Patterns, CONFIG } = require('./carregar').carregar();
+  const c = Patterns.compilar({ id: 'b21', bpm: 120, duracaoBatidas: 20, eventos: [{ batida: 4, tipo: 'paredes', centro: [0.3, 0.5] }] }, CONFIG.caixa);
+  assert.strictEqual(c.specs.length, 2);
+  for (const s of c.specs) assert.ok(Number.isFinite(s.fechada) && Number.isFinite(s.recolhida), JSON.stringify(s));
+});

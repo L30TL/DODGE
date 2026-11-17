@@ -10,6 +10,20 @@ O que mudou em cada versão. Bugs com número (B01…) estão detalhados em `BUG
 - O analisador de fases e os bots entendem os modificadores (toda fase continua provadamente possível).
 - Laboratório (`?debug=1`) ganhou um trecho com todos os modificadores; teste de navegador em `tools/navegador/modificadores.js`.
 
+### Editor de fases
+- Botão **CRIAR** na lista de fases → **Minhas fases** (nova, editar, duplicar, apagar com "trazer de volta").
+- **Linha do tempo em batidas** com a faixa da música: seções (intro, verso, refrão…), bumbo, caixa e melodia desenhados, pra encaixar os ataques nas notas.
+- **Ímã**: prende na grade (1/4, 1/2, batida), nas notas da música (bumbo, caixa, melodia) ou solto.
+- **Paleta** com os 8 ataques e os 5 modificadores; **inspetor** com todos os campos (setinhas, opções, listas de posições); tocar na **prévia** posiciona o ataque.
+- **Prévia da caixa** no ponto exato do cursor, com o mesmo motor e o mesmo desenho do jogo (avisos, giro, escuro, espelho).
+- **Tocar** com a música (os sons dos ataques junto), **testar daqui** (cada morte recomeça do mesmo ponto; não mexe no save do jogo) e voltar pro editor.
+- **Desfazer/refazer** (Ctrl+Z, Ctrl+Shift+Z, Ctrl+Y), copiar/colar/duplicar (Ctrl+C, Ctrl+V, Ctrl+D), atalhos de teclado.
+- **Salva sozinho** a cada mudança, numa chave própria (`dodge.criadas`) com versão, backup, cópia de segurança se estragar, mescla entre abas e lixeira.
+- Propriedades: nome (caixa de texto que abre o teclado no celular), música e dificuldade sugerida.
+
+### Correções
+- Paredes com "centro" em lista ficavam invisíveis e sem colisão (B21).
+
 ## 0.2.0-dev — Overhaul, Sessão 1: fundação (17/11/2026)
 
 ### Jogando

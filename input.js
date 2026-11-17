@@ -35,14 +35,19 @@ const Input = (() => {
   }
 
   function emitir(e) { if (destino) destino(e); }
+  // elementos HTML por cima do jogo (painel de debug, caixa de texto): o jogo não mexe neles
+  const FORA = '.debug-painel, .entrada-texto';
+  const foraDoJogo = (ev) => !!(ev.target && ev.target.closest && ev.target.closest(FORA));
 
   function init(cv) {
     canvas = cv;
     window.addEventListener('keydown', (ev) => {
+      if (foraDoJogo(ev)) return;                       // digitando numa caixa de texto
       const k = MAPA[ev.code];
-      if (k || ev.code === 'Tab') ev.preventDefault();
+      const ctrl = ev.ctrlKey || ev.metaKey;
+      if (k || ev.code === 'Tab' || (ctrl && Input.atalhos && /^Key[ZYSDCVA]$/.test(ev.code))) ev.preventDefault();
       seguradas[ev.code] = true;
-      emitir({ t: 'tecla', k: k || null, code: ev.code, repetida: ev.repeat });
+      emitir({ t: 'tecla', k: k || null, code: ev.code, repetida: ev.repeat, ctrl, shift: ev.shiftKey });
     });
     window.addEventListener('keyup', (ev) => { seguradas[ev.code] = false; });
     window.addEventListener('blur', () => { for (const c in seguradas) seguradas[c] = false; arrasto.id = null; dedos.clear(); });
@@ -50,7 +55,7 @@ const Input = (() => {
     // ponteiros na janela inteira: dá pra arrastar fora do canvas (bordas pretas)
     const alvo = document;
     alvo.addEventListener('pointerdown', (ev) => {
-      if (ev.target && ev.target.closest && ev.target.closest('.debug-painel')) return;
+      if (foraDoJogo(ev)) return;
       if (ev.pointerType === 'touch') usouToque = true;
       dedos.set(ev.pointerId, { x: ev.clientX, y: ev.clientY });
       if (arrasto.id === null) {
@@ -89,13 +94,21 @@ const Input = (() => {
     alvo.addEventListener('pointerup', fim('up'));
     alvo.addEventListener('pointercancel', fim('cancel'));
     // evita zoom/rolagem/menu de contexto no celular
-    document.addEventListener('touchmove', (ev) => { if (!(ev.target.closest && ev.target.closest('.debug-painel'))) ev.preventDefault(); }, { passive: false });
+    document.addEventListener('touchmove', (ev) => { if (!foraDoJogo(ev)) ev.preventDefault(); }, { passive: false });
+    // roda do mouse / dois dedos no touchpad (o editor rola e dá zoom na linha do tempo)
+    canvas.addEventListener('wheel', (ev) => {
+      ev.preventDefault();
+      const p = logico(ev);
+      const f = ev.deltaMode === 1 ? 16 : ev.deltaMode === 2 ? 400 : 1;
+      emitir({ t: 'roda', x: p.x, y: p.y, dx: ev.deltaX * f, dy: ev.deltaY * f, ctrl: ev.ctrlKey || ev.metaKey, shift: ev.shiftKey });
+    }, { passive: false });
     document.addEventListener('contextmenu', (ev) => ev.preventDefault());
     document.addEventListener('gesturestart', (ev) => ev.preventDefault());
   }
 
   return {
     init,
+    atalhos: false,                   // true no editor: Ctrl+Z/Y/S/D/C/V/A não vão pro navegador
     set destino(f) { destino = f; },
     get usouToque() { return usouToque; },
     temToque() { return usouToque || ('ontouchstart' in window) || navigator.maxTouchPoints > 0; },

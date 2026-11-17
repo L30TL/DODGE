@@ -72,6 +72,74 @@ const TEXTOS = {
     vitoriaTentativas: 'TENTATIVAS',
     vitoriaRaspoes: 'RASPÕES',
     vitoriaMoedas: 'MOEDAS',
+    // ------------------------------------------------------------ editor
+    criar: 'CRIAR',
+    editor: {
+      minhasFases: 'MINHAS FASES',
+      nova: 'NOVA FASE',
+      nomePadrao: 'MINHA FASE {n}',
+      nenhuma: 'NENHUMA FASE AINDA. TOQUE EM NOVA FASE!',
+      editar: 'EDITAR',
+      duplicar: 'DUPLICAR',
+      copiaDe: '{nome} (CÓPIA)',
+      apagar: 'APAGAR',
+      apagada: 'FASE APAGADA',
+      desfazerApagar: 'TRAZER DE VOLTA',
+      eventos: '{n} EVENTOS',
+      editadaHa: 'EDITADA {quando}',
+      agora: 'AGORA',
+      minutos: 'HÁ {n} MIN',
+      horas: 'HÁ {n} H',
+      dias: 'HÁ {n} DIAS',
+      nome: 'NOME',
+      nomeDaFase: 'NOME DA FASE',
+      ok: 'OK',
+      cancelar: 'CANCELAR',
+      musica: 'MÚSICA',
+      dificuldade: 'DIFICULDADE',
+      propriedades: 'PROPRIEDADES',
+      fechar: 'FECHAR',
+      apagarFase: 'APAGAR FASE',
+      confirmar: 'CONFIRMAR?',
+      testar: 'TESTAR',
+      adicionarEm: 'ADICIONAR NA BATIDA {n}',
+      batida: 'BATIDA',
+      batidaDe: 'BATIDA {n} / {total}',
+      fim: 'FIM',
+      depoisDoFim: 'DEPOIS DO FIM DA MÚSICA',
+      toquePosicao: 'TOQUE NA CAIXA PRA POSICIONAR',
+      limite: 'LIMITE DE EVENTOS DA FASE',
+      salvo: 'SALVO',
+      salvando: 'SALVANDO...',
+      semArmazenamento: 'NÃO DÁ PRA SALVAR NESTE NAVEGADOR',
+      desfeito: 'DESFEITO',
+      refeito: 'REFEITO',
+      copiado: 'EVENTO COPIADO',
+      colado: 'EVENTO COLADO',
+      testeTitulo: 'TESTE',
+      editorVoltar: 'EDITOR',
+      venceuTeste: 'VOCÊ VENCEU SUA FASE!',
+      ima: 'ÍMÃ: {modo}',
+      imas: { q: '1/4', m: '1/2', b: 'BATIDA', bumbo: 'BUMBO', caixa: 'CAIXA', melodia: 'MELODIA', livre: 'LIVRE' },
+      musicas: { despertar: 'DESPERTAR', correnteza: 'CORRENTEZA', prensa: 'PRENSA' },
+      secoes: { intro: 'INTRO', verso: 'VERSO', verso2: 'VERSO', pre: 'PRÉ', refrao: 'REFRÃO', ponte: 'PONTE',
+        final: 'FINAL', fim: 'FIM', quebra: 'QUEBRA', sobe: 'SUBIDA', menu: 'MENU' },
+      tipos: { chuva: 'CHUVA', fogo: 'FOGO CRUZADO', laser: 'LASER', paredes: 'PAREDES', espiral: 'ESPIRAL',
+        teleguiada: 'TELEGUIADA', anel: 'ANEL', moeda: 'MOEDA', caixa: 'TAMANHO', girar: 'GIRAR', escuro: 'ESCURO',
+        inverter: 'INVERTER', espelho: 'ESPELHO' },
+      curtos: { chuva: 'CHUVA', fogo: 'FOGO', laser: 'LASER', paredes: 'PAREDE', espiral: 'ESPIRAL',
+        teleguiada: 'MIRA', anel: 'ANEL', moeda: 'MOEDA', caixa: 'TAMANHO', girar: 'GIRAR', escuro: 'ESCURO',
+        inverter: 'INVERTE', espelho: 'ESPELHO' },
+      campos: { pos: 'POSIÇÕES', de: 'VEM DE', vel: 'VELOCIDADE', tam: 'TAMANHO', intervalo: 'INTERVALO (BAT)',
+        aviso: 'AVISO (BAT)', eixo: 'EIXO', alternar: 'ALTERNAR LADOS', orient: 'DIREÇÃO', larg: 'LARGURA',
+        dur: 'DURAÇÃO (BAT)', ate: 'VARRE ATÉ', modo: 'MODO', centro: 'CENTRO', espaco: 'ESPAÇO', fechar: 'FECHAR (BAT)',
+        segurar: 'SEGURAR (BAT)', abrir: 'ABRIR (BAT)', x: 'X', y: 'Y', bracos: 'BRAÇOS', giro: 'GIRO', ang: 'ÂNGULO',
+        cadencia: 'TIROS/BATIDA', quantidade: 'QUANTIDADE', guia: 'CURVA', guiaDur: 'CURVA DURA (BAT)', raio: 'RAIO',
+        id: 'QUAL MOEDA', largura: 'LARGURA', altura: 'ALTURA', angulo: 'ÂNGULO', nivel: 'ESCURIDÃO', ativo: 'LIGADO',
+        invX: 'INVERTE ←→', invY: 'INVERTE ↑↓', raioLuz: 'LUZ (RAIO)' },
+      opcoes: { cima: 'CIMA', baixo: 'BAIXO', esquerda: 'ESQUERDA', direita: 'DIREITA', h: 'HORIZONTAL', v: 'VERTICAL',
+        fechar: 'FECHAR', buraco: 'BURACO', x: '←→', y: '↑↓', xy: 'OS DOIS', sim: 'SIM', nao: 'NÃO', nada: '-' },
+    },
     dificuldades: {
       facil: 'FÁCIL',
       normal: 'NORMAL',
@@ -191,6 +259,8 @@ const Fonte = (() => {
     '·': ['.', '.', '.', '#', '.', '.', '.'],
     '→': ['.......', '....#..', '.....#.', '#######', '.....#.', '....#..', '.......'],
     '←': ['.......', '..#....', '.#.....', '#######', '.#.....', '..#....', '.......'],
+    '↑': ['..#..', '.###.', '#.#.#', '..#..', '..#..', '..#..', '..#..'],
+    '↓': ['..#..', '..#..', '..#..', '..#..', '#.#.#', '.###.', '..#..'],
     '★': ['...#...', '..###..', '#######', '.#####.', '..###..', '.##.##.', '.#...#.'],
     '_': ['.....', '.....', '.....', '.....', '.....', '.....', '#####'],
     ' ': ['...', '...', '...', '...', '...', '...', '...'],
@@ -258,6 +328,8 @@ const Fonte = (() => {
   }
 
   function glifo(ch) { return mapa[ch] || mapa['?']; }
+  // a fonte tem esse caractere? (nomes digitados pelo jogador)
+  function suporta(ch) { if (!atlas) construir(); return !!mapa[String(ch).toUpperCase()]; }
 
   function largura(str, escala = 1) {
     str = String(str).toUpperCase();
@@ -292,7 +364,7 @@ const Fonte = (() => {
     }
   }
 
-  return { desenhar, largura, ALTURA: 7 };
+  return { desenhar, largura, suporta, ALTURA: 7 };
 })();
 
 // =============================================================================
@@ -396,6 +468,30 @@ const Sprites = (() => {
     setaEsq: ['....#', '...##', '..###', '.####', '..###', '...##', '....#'],
     cadeado: ['.###.', '#...#', '#...#', '#####', '##.##', '##.##', '#####'],
     check: ['......#', '.....##', '#...##.', '##.##..', '.###...', '..#....', '.......'],
+    // editor
+    lapis: ['.....##', '....#.#', '...#.#.', '..#.#..', '.#.#...', '###....', '##.....'],
+    desfazer: ['..#....', '.##....', '#######', '.##...#', '..#...#', '......#', '..####.'],
+    refazer: ['....#..', '....##.', '#######', '#...##.', '#...#..', '#......', '.####..'],
+    tocar: ['#....', '##...', '###..', '####.', '###..', '##...', '#....'],
+    mais: ['.....', '..#..', '..#..', '#####', '..#..', '..#..', '.....'],
+    menos: ['.....', '.....', '.....', '#####', '.....', '.....', '.....'],
+    lixo: ['.###.', '#####', '.....', '#.#.#', '#.#.#', '#.#.#', '.###.'],
+    copia: ['####.', '#..#.', '#.####', '#.#..#', '###..#', '..#..#', '..####'],
+    ima: ['##.##', '##.##', '#...#', '#...#', '#...#', '.###.', '.....'],
+    // tipos de evento (paleta e linha do tempo)
+    ev_chuva: ['#..#..#', '#..#..#', '.......', '.#..#..', '.#..#..', '.......', '#..#..#'],
+    ev_fogo: ['##.....', '.......', '....##.', '.......', '##.....', '.......', '....##.'],
+    ev_laser: ['..###..', '..###..', '..###..', '..###..', '..###..', '..###..', '..###..'],
+    ev_paredes: ['##...##', '##...##', '##...##', '##...##', '##...##', '##...##', '##...##'],
+    ev_espiral: ['..#....', '.....#.', '.#.....', '...#...', '.....#.', '.#.....', '....#..'],
+    ev_teleguiada: ['...#...', '..###..', '.#.#.#.', '...#...', '...#...', '.......', '...#...'],
+    ev_anel: ['..#.#..', '.......', '#.....#', '...#...', '#.....#', '.......', '..#.#..'],
+    ev_moeda: ['..###..', '.#...#.', '#..#..#', '#.###.#', '#..#..#', '.#...#.', '..###..'],
+    ev_caixa: ['##...##', '#.....#', '.......', '...#...', '.......', '#.....#', '##...##'],
+    ev_girar: ['..###..', '.#...#.', '#.....#', '#.....#', '#...###', '.#...#.', '.....#.'],
+    ev_escuro: ['..###..', '.##....', '##.....', '##.....', '##.....', '.##....', '..###..'],
+    ev_inverter: ['..#....', '.#.....', '#######', '.......', '#######', '.....#.', '....#..'],
+    ev_espelho: ['##...##', '##...##', '...#...', '...#...', '...#...', '##...##', '##...##'],
     // dedo arrastando (dica de toque)
     dedo: [
       '....##......',
@@ -503,6 +599,66 @@ const UI = {
     ctx.drawImage(img, Math.round(x), Math.round(y), w, h);
   },
 };
+
+// ------------------------------------------------------------ EntradaTexto --
+// Caixa de texto de verdade (HTML) por cima do jogo: no celular abre o teclado.
+// Só aceita caracteres que a fonte do jogo sabe desenhar.
+const EntradaTexto = (() => {
+  let caixa = null, campo = null, titulo = null, ok = null, cancelar = null, atual = null;
+  function limpar(txt, max) {
+    let out = '';
+    for (const ch of String(txt).toUpperCase()) if (Fonte.suporta(ch)) out += ch;
+    return out.replace(/\s+/g, ' ').slice(0, max);
+  }
+  function fechar(confirmou) {
+    if (!atual) return;
+    const a = atual; atual = null;
+    caixa.style.display = 'none';
+    campo.blur();
+    if (confirmou) a.aoConfirmar && a.aoConfirmar(limpar(campo.value, a.max).trim());
+    else a.aoCancelar && a.aoCancelar();
+  }
+  function criar() {
+    caixa = document.createElement('div');
+    caixa.className = 'entrada-texto';
+    caixa.innerHTML = '<div class="et-painel"><div class="et-titulo"></div>' +
+      '<input class="et-campo" type="text" autocomplete="off" autocapitalize="characters" spellcheck="false" enterkeyhint="done">' +
+      '<div class="et-botoes"><button class="et-cancelar"></button><button class="et-ok"></button></div></div>';
+    document.body.appendChild(caixa);
+    titulo = caixa.querySelector('.et-titulo');
+    campo = caixa.querySelector('.et-campo');
+    ok = caixa.querySelector('.et-ok');
+    cancelar = caixa.querySelector('.et-cancelar');
+    ok.addEventListener('click', () => fechar(true));
+    cancelar.addEventListener('click', () => fechar(false));
+    caixa.addEventListener('pointerdown', (e) => { if (e.target === caixa) fechar(false); });
+    campo.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') { e.preventDefault(); fechar(true); }
+      else if (e.key === 'Escape') { e.preventDefault(); fechar(false); }
+    });
+    campo.addEventListener('input', () => {
+      const l = limpar(campo.value, atual ? atual.max : 40);
+      if (l !== campo.value) campo.value = l;
+    });
+  }
+  return {
+    // op = { titulo, valor, max, aoConfirmar(texto), aoCancelar() }
+    pedir(op) {
+      if (!caixa) criar();
+      atual = Object.assign({ max: CONFIG.limites.maxTexto }, op);
+      titulo.textContent = op.titulo || '';
+      ok.textContent = t('editor.ok');
+      cancelar.textContent = t('editor.cancelar');
+      campo.maxLength = atual.max;
+      campo.value = limpar(op.valor || '', atual.max);
+      caixa.style.display = 'flex';
+      setTimeout(() => { campo.focus(); campo.select(); }, 30);
+    },
+    aberta() { return !!atual; },
+    fechar() { fechar(false); },
+    limpar,
+  };
+})();
 
 // ---------------------------------------------------------------- Controles --
 // Um conjunto de controles de uma tela: cuida de foco (teclado), toque e mouse.
@@ -791,6 +947,7 @@ UI.telas.fases = (() => {
     C.botao({ x: 52, y: CART.y + CART.h / 2 - 20, w: 26, h: 40, icone: Sprites.desenho('setaEsq', PAL.branco), acao: () => mudar(-1) });
     C.botao({ x: 402, y: CART.y + CART.h / 2 - 20, w: 26, h: 40, icone: Sprites.desenho('setaDir', PAL.branco), acao: () => mudar(1) });
     const pri = C.botao({ x: 180, y: 216, w: 120, h: 22, texto: t('jogar'), escala: 2, primario: true, cor: PAL.alma, acao: jogar });
+    C.botao({ x: 330, y: 6, w: 64, h: 16, texto: t('criar'), icone: Sprites.desenho('lapis', PAL.branco), acao: () => { Sound.sfx('confirmar'); Game.irPara('criadas'); } });
     C.focar(pri);
   }
 

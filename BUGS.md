@@ -147,3 +147,10 @@ Encontrados na auditoria da Etapa 0 (17/11/2026). "Sonda" = teste de navegador q
 - **Causa:** o mouse usava a sensibilidade do dedo (1,25); a alma seguia o arrasto com limite de 560 px/s e um buffer de 24 px que jogava o excesso fora; o primeiro movimento antes do frame seguinte se perdia; fora da janela o mouse parava de responder.
 - **Correção:** mouse sempre 1:1 (`CONFIG.toque.sensibilidadeMouse`); arrasto ancorado no clique (a alma vai pra onde o cursor levou, sem acumular erro); sem buffer; limite de 1400 px/s (a colisão em sub-passos garante que nada atravessa nada); captura do ponteiro (funciona fora da janela); encostou na parede e voltou, a alma volta na hora.
 - **Teste:** `tests/sim.test.js` › o dedo/mouse leva a alma exatamente até o alvo · `tools/navegador/mouse.js` (lento, puxão rápido, volta, parede: tudo 1:1).
+
+## B21 — Paredes com "centro" em lista ficavam invisíveis e sem colisão · corrigido (0.3.0)
+- **Encontrado:** na Sessão 2, montando o inspetor do editor (o validador aceita lista no `centro`, e o editor deixa criar).
+- **Reproduzir:** evento `{ tipo: 'paredes', centro: [0.3, 0.5] }` (modo normal, de fechar). As duas paredes viravam `NaN`: não apareciam e não matavam.
+- **Causa:** o modo normal fazia `(ev.centro || 0) * largura`; com uma lista de 2+ valores isso dá `NaN` (o modo "buraco" já tratava lista).
+- **Correção:** o modo normal usa o primeiro valor da lista.
+- **Teste:** `tests/padroes.test.js` › paredes com centro em lista têm posição de verdade.

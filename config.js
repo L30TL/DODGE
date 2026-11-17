@@ -135,6 +135,18 @@ const CONFIG = {
     dtSubpasso: 1 / 240,    // s — e pelo menos um a cada tanto de tempo (a morte cai no instante certo)
   },
 
+  // -------------------------------------------------------------- editor -----
+  editor: {
+    gravarDepoisMs: 600,    // ms — o editor grava sozinho esse tempo depois da última mudança
+    lixeira: 10,            // fases apagadas que ficam guardadas (dá pra trazer de volta)
+    historicoMax: 200,      // passos de desfazer
+    zoomPadrao: 8,          // px por batida na linha do tempo
+    zoomMin: 2, zoomMax: 48,
+    escalaPrevia: 0.72,     // tamanho da caixa na prévia (1 = tamanho do jogo)
+    passoPos: 0.05,         // quanto uma posição anda em cada toque nas setinhas
+    imaDistPx: 6,           // px — distância em que o ímã puxa pra nota da música
+  },
+
   // ------------------------------------------------------------- limites -----
   // Proteção contra fases quebradas ou maliciosas (editor e códigos compartilhados).
   limites: {

@@ -31,6 +31,19 @@
     @keyframes girar { 0%, 30% { transform: rotate(0deg); } 60%, 100% { transform: rotate(-90deg); } }
     @media (orientation: portrait) and (pointer: coarse) { #girar { display: flex; } }
     noscript { color: #fff; font: 16px monospace; }
+    /* caixa de texto do editor (nome da fase, código) */
+    .entrada-texto { display: none; position: fixed; inset: 0; z-index: 20; background: rgba(7,7,15,0.7);
+      align-items: center; justify-content: center; touch-action: auto; }
+    .et-painel { background: #1a1a33; border: 2px solid #f4f4ff; padding: 14px; width: min(420px, 86vw);
+      font: bold 15px monospace; color: #f4f4ff; letter-spacing: 1px; box-shadow: 4px 5px 0 #07070f; }
+    .et-titulo { margin-bottom: 10px; }
+    .et-campo { width: 100%; box-sizing: border-box; font: bold 18px monospace; text-transform: uppercase;
+      background: #07070f; color: #4df3ff; border: 2px solid #55557e; padding: 8px; outline: none; -webkit-user-select: text; user-select: text; }
+    .et-campo:focus { border-color: #ffd23f; }
+    .et-botoes { display: flex; justify-content: flex-end; gap: 10px; margin-top: 12px; }
+    .et-botoes button { font: bold 15px monospace; padding: 8px 16px; cursor: pointer; background: #24244a; color: #f4f4ff;
+      border: 2px solid #8888aa; letter-spacing: 1px; }
+    .et-botoes .et-ok { background: #4df3ff; color: #07070f; border-color: #f4f4ff; }
   </style>
 </head>
 <body>
@@ -42,6 +55,7 @@
   <script src="erros.js"></script>
   <script src="config.js"></script>
   <script src="save.js"></script>
+  <script src="criadas.js"></script>
   <script src="ui.js"></script>
   <script src="audio.js"></script>
   <script src="avatar.js"></script>

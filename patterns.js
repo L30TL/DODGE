@@ -381,7 +381,7 @@ const Patterns = (() => {
       const eixo = ev.eixo || 'h';
       const ext = eixo === 'h' ? C.hw : C.hh;
       const esp = ev.espaco || 48;
-      const c = clamp((ev.centro || 0) * ext, -ext + esp / 2, ext - esp / 2);
+      const c = clamp(arr(ev.centro, 0)[0] * ext, -ext + esp / 2, ext - esp / 2);   // lista: usa a 1ª
       const t0 = C.t(ev.batida);
       const tC = t0 + (ev.fechar !== undefined ? ev.fechar : 1) * C.B;
       const tO = tC + (ev.segurar !== undefined ? ev.segurar : 2) * C.B;
@@ -712,6 +712,6 @@ const Patterns = (() => {
     return s.recolhida;
   }
 
-  return { compilar, validar, Ataques, GERADORES, ESQUEMA, MODIFICADORES, TIPOS: { BALA, LASER, PAREDE, MURO, ORBE, EMISSOR, MOEDA },
+  return { compilar, validar, Ataques, GERADORES, ESQUEMA, COMUNS, DIFICULDADES, MODIFICADORES, TIPOS: { BALA, LASER, PAREDE, MURO, ORBE, EMISSOR, MOEDA },
     bordaParede, estadoCaixa, espelhar };
 })();
