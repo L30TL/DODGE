@@ -9,7 +9,7 @@
 // =============================================================================
 
 const CONFIG = {
-  versao: '0.2.0-dev',     // versão do jogo (aparece na tela inicial e no registro de erros)
+  versao: '0.3.0-dev',     // versão do jogo (aparece na tela inicial e no registro de erros)
 
   // ---------------------------------------------------------------- tela -----
   tela: {

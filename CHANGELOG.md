@@ -2,7 +2,7 @@
 
 O que mudou em cada versão. Bugs com número (B01…) estão detalhados em `BUGS.md`.
 
-## 0.3.0-dev — Overhaul, Sessões 2–3: editor (em andamento)
+## 0.3.0-dev — Overhaul, Sessão 2: editor (17/11/2026)
 
 ### Mecânicas novas (eventos de fase)
 - **Caixa que encolhe/estica** (`caixa`), **gira** (`girar`), **escurece** com luz só em volta da alma (`escuro`), **controles invertidos** (`inverter`) e **alma espelhada** (`espelho`). Cada um com aviso antes de acontecer.
