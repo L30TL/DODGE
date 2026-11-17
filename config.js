@@ -48,6 +48,25 @@ const CONFIG = {
                             //        garante que nada atravessa nada mesmo nessa velocidade)
   },
 
+  // --------------------------------------------------------- modos da alma ---
+  // Trocados por portais no meio da fase (evento "modo"). Hitbox: a mesma pra todo mundo.
+  modos: {
+    mini: { escala: 0.6, vel: 1.35 },          // hitbox/desenho × escala; velocidade × vel
+    gelo: { acel: 760, atrito: 1.1, velMax: 235, quique: 0.55, zonaAlvo: 3 },  // px/s², 1/s, px/s, 0–1, px
+    gravidade: {
+      g: 900,               // px/s² — gravidade
+      pulo: 310,            // px/s — força do pulo (sobe ~53 px)
+      velMaxQueda: 430,     // px/s
+      velX: 165,            // px/s — andar pros lados no teclado
+      coiote: 0.08,         // s — ainda dá pra pular logo depois de sair da beirada
+      buffer: 0.12,         // s — apertar o pulo um pouco antes de cair no chão vale
+    },
+    trilhos: { linhas: 3, alcance: 0.8, velTroca: 520 },   // linhas padrão, quanto da altura elas ocupam, px/s
+    escudo: { raio: 13, abertura: 100, velCentro: 600 },   // px, graus, px/s (a alma vai pro centro)
+    plataforma: { espessura: 4 },                         // px
+    portalAvisoBatidas: 2,  // batidas de aviso antes de trocar de modo (se a fase não disser)
+  },
+
   // ------------------------------------------------------------ ataques ------
   ataques: {
     avisoMinimoS: 0.3,      // s — nenhum aviso (até Insane) é menor que isso, mesmo se a fase pedir

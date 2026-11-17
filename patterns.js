@@ -22,7 +22,8 @@
 
 const Patterns = (() => {
   // tipos de spec (números são mais rápidos que strings no loop)
-  const BALA = 1, LASER = 2, PAREDE = 3, MURO = 4, ORBE = 5, EMISSOR = 6, MOEDA = 7;
+  const BALA = 1, LASER = 2, PAREDE = 3, MURO = 4, ORBE = 5, EMISSOR = 6, MOEDA = 7, PLATAFORMA = 8;
+  const MODOS = ['livre', 'gravidade', 'trilhos', 'escudo', 'gelo', 'mini'];
 
   // ======================================================== VALIDAÇÃO ======
   // Toda fase passa por aqui antes de compilar (oficial, do editor ou de código
@@ -49,6 +50,10 @@ const Patterns = (() => {
     girar: { angulo: NUM(-1440, 1440), dur: NUM(0, 32) },
     escuro: { nivel: NUM(0, 1), raio: NUM(12, 200), dur: NUM(0, 32) },
     inverter: { x: 'bool', y: 'bool' },
+    // portal: troca o modo da alma (livre, gravidade, trilhos, escudo, gelo, mini)
+    modo: { modo: MODOS, lado: ['baixo', 'cima'], linhas: INT(3, 5) },
+    // plataforma (só tem efeito no modo gravidade: dá pra ficar em cima dela)
+    plataforma: { x: NUM(-1, 1), y: NUM(-1, 1), larg: NUM(8, 288), dur: NUM(0.25, 64) },
     espelho: { ativo: 'bool', eixo: ['x', 'y', 'xy'] },
   };
   const DIFICULDADES = ['facil', 'normal', 'dificil', 'dificilimo', 'insano', 'demonio'];
@@ -81,7 +86,7 @@ const Patterns = (() => {
       case 'espiral': return 1 + Math.max(1, Math.round((ev.dur !== undefined ? ev.dur : 4) * (ev.cadencia || 2))) * (ev.bracos || 3);
       case 'teleguiada': return ev.quantidade || 3;
       case 'anel': return 1 + (ev.quantidade || 12);
-      case 'caixa': case 'girar': case 'escuro': case 'inverter': case 'espelho': return 0;
+      case 'caixa': case 'girar': case 'escuro': case 'inverter': case 'espelho': case 'modo': return 0;
       default: return 1;
     }
   }
@@ -178,10 +183,10 @@ const Patterns = (() => {
   // ===================================================== MODIFICADORES =====
   // Cada modificador muda uma "trilha" de estado: tamanho, ângulo, escuridão da caixa,
   // inversão dos controles, alma espelhada. O estado também é função do tempo.
-  const MODIFICADORES = { caixa: 1, girar: 1, escuro: 1, inverter: 1, espelho: 1 };
+  const MODIFICADORES = { caixa: 1, girar: 1, escuro: 1, inverter: 1, espelho: 1, modo: 1 };
 
   function montarTrilhas(eventos, C) {
-    const tr = { largura: [], altura: [], angulo: [], escuro: [], raio: [], invX: [], invY: [], espelho: [] };
+    const tr = { largura: [], altura: [], angulo: [], escuro: [], raio: [], invX: [], invY: [], espelho: [], modo: [], grav: [], linhas: [] };
     const avisosMod = [];
     const lista = eventos.map((ev, idx) => ({ ev, idx })).filter(x => tem(MODIFICADORES, x.ev.tipo))
       .sort((a, b) => a.ev.batida - b.ev.batida || a.idx - b.idx);
@@ -221,6 +226,12 @@ const Patterns = (() => {
           aviso.eixo = ev.ativo === false ? '' : (ev.eixo || 'x');
           degrau(tr.espelho, t0, aviso.eixo);
           break;
+        case 'modo':
+          aviso.modo = ev.modo || 'livre';
+          degrau(tr.modo, t0, aviso.modo);
+          degrau(tr.grav, t0, ev.lado === 'cima' ? -1 : 1);
+          degrau(tr.linhas, t0, ev.linhas || CONFIG.modos.trilhos.linhas);
+          break;
       }
       avisosMod.push(aviso);
     }
@@ -250,6 +261,9 @@ const Patterns = (() => {
     out.invX = valorTrilha(tr.invX, t, false);
     out.invY = valorTrilha(tr.invY, t, false);
     out.espelho = valorTrilha(tr.espelho, t, '');
+    out.modo = valorTrilha(tr.modo, t, 'livre');
+    out.grav = valorTrilha(tr.grav, t, 1);
+    out.linhas = valorTrilha(tr.linhas, t, CONFIG.modos.trilhos.linhas);
     return out;
   }
 
@@ -464,6 +478,13 @@ const Patterns = (() => {
       }
     },
 
+    // { batida, tipo:'plataforma', x, y, larg, dur, aviso } — chão extra no modo gravidade (y = em cima dela)
+    plataforma(ev, C, idx) {
+      const t0 = C.t(ev.batida);
+      C.add({ k: PLATAFORMA, tA: t0 - C.aviso(ev), t0, tF: t0 + (ev.dur !== undefined ? ev.dur : 8) * C.B,
+        x: (ev.x || 0) * C.hw, y: (ev.y || 0) * C.hh, larg: ev.larg || 60 }, ev, idx);
+    },
+
     // { batida, tipo:'moeda', x, y, dur, id: 0|1|2 }
     moeda(ev, C, idx) {
       const t0 = C.t(ev.batida);
@@ -624,6 +645,7 @@ const Patterns = (() => {
       for (let i = 0; i < this.n; i++) {
         const o = this.vivos[i];
         const s = o.s;
+        if (o.morto || s.k === PLATAFORMA) continue;            // bloqueado pelo escudo / plataforma não mata
         if (s.k === MOEDA) {
           if (!o.pego && t >= s.t0) {
             const dx = px - s.x, dy = py - s.y;
@@ -714,6 +736,6 @@ const Patterns = (() => {
     return s.recolhida;
   }
 
-  return { compilar, validar, Ataques, GERADORES, ESQUEMA, COMUNS, DIFICULDADES, MODIFICADORES, TIPOS: { BALA, LASER, PAREDE, MURO, ORBE, EMISSOR, MOEDA },
+  return { compilar, validar, Ataques, GERADORES, ESQUEMA, COMUNS, DIFICULDADES, MODIFICADORES, MODOS, TIPOS: { BALA, LASER, PAREDE, MURO, ORBE, EMISSOR, MOEDA, PLATAFORMA },
     bordaParede, estadoCaixa, espelhar };
 })();
