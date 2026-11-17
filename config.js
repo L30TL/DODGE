@@ -185,6 +185,13 @@ const CONFIG = {
     maxBytes: 1000000,      // bytes depois de descompactar (proteção contra código "bomba")
   },
 
+  // -------------------------------------------------------------- solver -----
+  solver: {
+    passo: 1 / 60,          // s — passo de tempo do solver (em cada passo a alma anda 1 célula da grade)
+    margem: 0.5,            // px — o solver considera a hitbox da alma esse tanto maior (conservador)
+    passadas: 3,            // provar: até quantas vezes refaz o caminho com as teleguiadas mirando nele
+  },
+
   // ------------------------------------------------------------- limites -----
   // Proteção contra fases quebradas ou maliciosas (editor e códigos compartilhados).
   limites: {

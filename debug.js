@@ -59,6 +59,14 @@ const Debug = (() => {
       if (c === 'KeyI') { D.invencivel = !D.invencivel; marcarTrapaca(); return true; }
       if (c === 'KeyL') { trocarVel(); return true; }
       if (c === 'KeyB') { D.bot = !D.bot; marcarTrapaca(); return true; }
+      if (c === 'KeyS' && Game.nomeTela === 'jogo') {
+        // assistir o solver: segue o caminho provado desde o começo da fase
+        if (D.caminho) { D.caminho = null; return true; }
+        D.assistirSolver(Game.J.fase);
+        marcarTrapaca();
+        if (D.caminho) Game.comecarTentativa(0);
+        return true;
+      }
       if (c === 'KeyK') { Game.matar(); return true; }
       if (Game.nomeTela === 'jogo') {
         const m = /^Digit(\d)$/.exec(c);
@@ -75,6 +83,15 @@ const Debug = (() => {
     // ------------------------------------------------------------ BOT ------
     // Piloto automático: testa 9 direções olhando ~0,6 s pra frente e escolhe a
     // mais segura. Só enxerga o que já está na tela (avisos), como um jogador.
+    // Bot que segue o caminho do solver (tecla S no debug): devolve o alvo pra entrada, ou null.
+    caminho: null,
+    alvoSolver(t, out) { return D.caminho ? Solver.noCaminho(D.caminho, t, out) : null; },
+    assistirSolver(fase) {
+      const p = Solver.provar(fase);
+      D.caminho = p.caminho || null;
+      D.bot = false;
+      return p;
+    },
     direcaoBot(corrida) {
       return bot(corrida.alma, corrida.at, corrida.t, corrida.lim, 0, corrida.est.espelho);
     },

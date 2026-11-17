@@ -680,8 +680,8 @@ const Patterns = (() => {
           if (t < s.t0 || t >= s.tF) return Infinity;
           const e = bordaParede(s, t);
           const coord = s.eixo === 'h' ? px : py;
-          // lado -1: parede ocupa (-inf, e]; lado +1: [e, inf)
-          return (s.lado < 0 ? coord - e : e - coord) - CONFIG.ataques.folgaHitbox;
+          // lado -1: parede ocupa (-inf, e]; lado +1: [e, inf). A hitbox é a folga MENOR que o desenho (B25)
+          return (s.lado < 0 ? coord - e : e - coord) + CONFIG.ataques.folgaHitbox;
         }
         case MURO: {
           if (t < s.t0) return Infinity;
@@ -692,7 +692,7 @@ const Patterns = (() => {
           // o muro são dois retângulos: antes do vão e depois do vão
           const d1 = distRet(dA, b - (s.g - s.esp / 2));
           const d2 = distRet(dA, (s.g + s.esp / 2) - b);
-          return Math.min(d1, d2) - s.hrFolga;
+          return Math.min(d1, d2) + s.hrFolga;                // hitbox menor que o desenho, como as balas (B25)
         }
         default: return Infinity;
       }

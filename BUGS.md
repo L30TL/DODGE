@@ -175,3 +175,10 @@ Encontrados na auditoria da Etapa 0 (17/11/2026). "Sonda" = teste de navegador q
 - **Causa:** o grupo novo dos efeitos de nick foi criado com a mesma chave (`efeitos`) do rótulo antigo; no objeto TEXTOS a segunda chave apagou a primeira.
 - **Correção:** o grupo virou `efeitosNick`.
 - **Teste:** `tests/textos.test.js` agora exige que toda chave completa usada em `t()` seja um texto (não um grupo), e confere o inglês chave por chave.
+
+## B25 — Paredes matavam 1 px antes de encostar no desenho · corrigido (0.7.0)
+- **Encontrado:** na Sessão 6, jogando a fase seguindo o caminho do solver novo (a alma morria a 2 px da parede).
+- **Reproduzir:** Prensa, batida 9,5: parar a 2 px da borda da parede que fecha. O desenho não encosta, mas a alma morria.
+- **Causa:** a folga da hitbox (`CONFIG.ataques.folgaHitbox`, "hitbox menor que o desenho") era SUBTRAÍDA da distância nas paredes e nos muros com vão — deixando a hitbox deles 1 px MAIOR que o desenho. Nas balas e lasers estava certo.
+- **Correção:** paredes e muros somam a folga, como os outros ataques (ficaram 2 px mais justos com o jogador).
+- **Teste:** `tests/sim.test.js` › parede: a hitbox é menor que o desenho; e a prova construtiva das fases oficiais.

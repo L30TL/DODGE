@@ -160,6 +160,7 @@ const Game = (() => {
   const pega = { sessao: -1, ultX: 0, ultY: 0, alvoX: 0, alvoY: 0, reancorar: false };
   const almaEspelho = { x: 0, y: 0 };
   const dirArrasto = { x: 0, y: 0 };
+  const alvoSolver = { x: 0, y: 0 };
 
   // Estado VISUAL da alma (posição copiada da simulação a cada frame).
   const alma = {
@@ -365,6 +366,11 @@ const Game = (() => {
       const d = Debug.bot ? Debug.direcaoBot(J.corrida) : Input.direcao();
       entrada.dx = d.x; entrada.dy = d.y; entrada.local = !!Debug.bot;
       calcularAlvo();
+      if (Debug.caminho && Debug.alvoSolver(t, alvoSolver)) {
+        // assistindo o solver: a alma segue o caminho provado
+        entrada.dx = 0; entrada.dy = 0; entrada.local = true;
+        entrada.temAlvo = true; entrada.alvoX = alvoSolver.x; entrada.alvoY = alvoSolver.y;
+      }
       J.corrida.invencivel = Debug.invencivel;
       const ox = alma.x, oy = alma.y;
       const evs = J.corrida.passo(t, entrada);

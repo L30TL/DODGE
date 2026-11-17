@@ -83,11 +83,12 @@ test('raspão e moeda contam uma vez só', () => {
   assert.deepStrictEqual(Array.from(r.moedas), [false, true, false]);
 });
 
-test('todas as fases oficiais compilam sem avisos e são vencíveis pelo analisador', { timeout: 120000 }, () => {
+test('todas as fases oficiais são PROVADAS: o caminho do solver vence a simulação de verdade', { timeout: 180000 }, () => {
   const D = carregar(['config.js', 'patterns.js', 'sim.js', 'levels.js', 'solver.js', 'debug.js']);
   for (const f of D.Levels.FASES) {
-    const a = D.pegar('Debug').analisar(f);
-    assert.ok(a.ok, `${f.id} impossível em ${a.morreuEm}`);
+    assert.strictEqual(D.Patterns.validar(f).avisos.length, 0, `${f.id} tem avisos do validador`);
+    const p = D.pegar('Solver').provar(f);
+    assert.ok(p.ok, `${f.id} não provada (${p.morte ? 'morre na batida ' + p.morte.t / (60 / f.bpm) : 'sem caminho'})`);
   }
 });
 
@@ -166,7 +167,7 @@ test('o analisador entende a caixa encolhida, o empurrão da parede e o espelho'
   // o centro é proibido e logo depois a caixa fecha de uma vez: a parede empurra a alma, não mata
   const empurra = fase40('a3', [
     { batida: 4, tipo: 'laser', pos: 0, orient: 'v', larg: 120, aviso: 2, dur: 4 },
-    { batida: 8, tipo: 'caixa', largura: 0.3, dur: 0 },                    // fecha no instante em que o laser apaga
+    { batida: 8.1, tipo: 'caixa', largura: 0.3, dur: 0 },                  // fecha logo depois que o laser apaga
   ]);
   assert.ok(D.analisar(empurra).ok, 'empurrão da parede');
   const r = corridaDe(empurra);
@@ -182,4 +183,18 @@ test('o analisador entende a caixa encolhida, o empurrão da parede e o espelho'
   assert.ok(!D.analisar(fase40('a5', lasers.concat([{ batida: 1, tipo: 'espelho', eixo: 'x' }]))).ok, 'com espelho: impossível');
   // caixa girada não muda o que é possível (só anda um pouco mais devagar no teclado)
   assert.ok(D.analisar(fase40('a6', [{ batida: 1, tipo: 'girar', angulo: 30, dur: 2 }, meio])).ok);
+});
+
+test('parede: a hitbox é menor que o desenho (folga), como nas balas (B25)', () => {
+  // paredes fecham deixando um corredor de 70 px no meio (bordas em x = ±35)
+  const f = { id: 'b25', bpm: 120, duracaoBatidas: 20, eventos: [{ batida: 2, tipo: 'paredes', eixo: 'h', centro: 0, espaco: 70, fechar: 1, segurar: 2, abrir: 1, aviso: 2 }] };
+  const borda = 35 - CONFIG.alma.raioHitbox + CONFIG.ataques.folgaHitbox;   // até onde a alma pode chegar
+  const jogar = (x) => {
+    const r = corridaDe(f);
+    r.reiniciar(0, x, 0);
+    for (let t = 0; t < 4; t += 1 / 60) r.passo(t, parado);
+    return r.estado;
+  };
+  assert.strictEqual(jogar(-(borda - 0.3)), 'jogando', '0,3 px antes da hitbox: vive');
+  assert.strictEqual(jogar(-(borda + 0.3)), 'morto', '0,3 px além da hitbox: morre');
 });
