@@ -5,7 +5,7 @@ const path = require('path'), os = require('os');
 const PASTA = process.argv[2] || os.tmpdir();
 (async () => {
   const browser = await chromium.launch({ args: ['--autoplay-policy=no-user-gesture-required'] });
-  const page = await browser.newPage({ viewport: { width: 960, height: 540 } });
+  const page = await browser.newPage({ viewport: { width: 960, height: 540 }, locale: 'pt-BR' });
   const erros = [];
   page.on('pageerror', e => erros.push(e.message));
   page.on('console', m => { if (m.type() === 'error') erros.push(m.text()); });
@@ -54,7 +54,7 @@ const PASTA = process.argv[2] || os.tmpdir();
   await foto('2-perfil');
   // modo infinito: dá a volta na música (segmento novo, a alma continua), morre e grava o tempo
   await page.evaluate(() => Game.irPara('fases')); await page.waitForTimeout(200);
-  await clicar(72 + 38, 14, 600);                                          // INFINITO
+  await clicar(100 + 38, 14, 600);                                         // INFINITO
   const inf0 = await page.evaluate(() => ({ tela: Game.nomeTela, k: Game.J.infinito && Game.J.infinito.k, loop: Sound._estado ? true : true }));
   conferir(inf0.tela === 'jogo' && inf0.k === 0, `INFINITO começa na volta 1 (${JSON.stringify(inf0)})`);
   await page.evaluate(() => { const d = Game.J.comp.duracao; Game.J.corrida.t = d - 0.4; Game.J.corrida.alma.x = 50;

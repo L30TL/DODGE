@@ -7,7 +7,7 @@ const res = [];
 const ok = (nome, bug, detalhe) => { res.push({ nome, bug, detalhe }); console.log((bug ? 'BUG  ' : 'ok   ') + nome + ' — ' + detalhe); };
 
 async function novaPagina(browser, init) {
-  const ctx = await browser.newContext({ viewport: { width: 960, height: 540 } });
+  const ctx = await browser.newContext({ viewport: { width: 960, height: 540 }, locale: 'pt-BR' });
   const page = await ctx.newPage();
   page.__erros = [];
   page.on('pageerror', e => page.__erros.push(e.message));
@@ -60,7 +60,7 @@ async function novaPagina(browser, init) {
 
   // P3: save corrompido é sobrescrito sem backup
   {
-    const ctx = await browser.newContext();
+    const ctx = await browser.newContext({ locale: 'pt-BR' });
     const page = await ctx.newPage();
     // o save já está estragado no disco quando o jogo abre (antes dos scripts do jogo rodarem)
     await page.addInitScript(() => {
@@ -79,7 +79,7 @@ async function novaPagina(browser, init) {
 
   // P4: recorde perdido se fechar o jogo logo depois de morrer
   {
-    const ctx = await browser.newContext();
+    const ctx = await browser.newContext({ locale: 'pt-BR' });
     const page = await ctx.newPage();
     await page.goto(URL);
     await page.evaluate(() => localStorage.clear());

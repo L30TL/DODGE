@@ -182,7 +182,7 @@ UI.telas.visual = (() => {
     for (const b of C.itens) {
       if (b._efeito) {
         const e = Progresso.EFEITOS.find(x => x.id === b._efeito), livre = Progresso.efeitoLiberado(Save.dados, e.id);
-        desenharNick(c, t('efeitos.' + e.id), b.x + b.w / 2, b.y + 4, e.id, Avatar.corPrincipal(prova));
+        desenharNick(c, t('efeitosNick.' + e.id), b.x + b.w / 2, b.y + 4, e.id, Avatar.corPrincipal(prova));
         if (!livre && e.preco) UI.texto(c, String(e.preco), b.x + b.w / 2, b.y + 12, { alinhar: 'centro', cor: Save.dados.moedas >= e.preco ? PAL.ouro : PAL.cinza });
         if (!livre && !e.preco) c.drawImage(Sprites.desenho('cadeado', PAL.cinzaClaro), b.x + b.w / 2 - 3, b.y + 11);
       } else if (b._emblema) c.drawImage(Sprites.desenho('trofeu', Save.dados.perfil.emblema === b._emblema ? PAL.preto : PAL.ouro), b.x + 11, b.y + 6);

@@ -72,6 +72,8 @@ const TEXTOS = {
     vitoriaTentativas: 'TENTATIVAS',
     vitoriaRaspoes: 'RASPÕES',
     vitoriaMoedas: 'MOEDAS',
+    idioma: 'IDIOMA / LANGUAGE',
+    outroIdioma: 'ENGLISH',
     // ------------------------------------------------------- progressão
     alma: 'ALMA',
     perfil: 'PERFIL',
@@ -84,7 +86,7 @@ const TEXTOS = {
     moldura: 'MOLDURA',
     nenhum: 'NENHUM',
     nenhuma: 'NENHUMA',
-    efeitos: { nenhum: 'NENHUM', cor: 'COR', degrade: 'DEGRADÊ', onda: 'ONDA', brilho: 'BRILHO', arcoiris: 'ARCO-ÍRIS', faiscas: 'FAÍSCAS' },
+    efeitosNick: { nenhum: 'NENHUM', cor: 'COR', degrade: 'DEGRADÊ', onda: 'ONDA', brilho: 'BRILHO', arcoiris: 'ARCO-ÍRIS', faiscas: 'FAÍSCAS' },
     molduras: { bronze: 'BRONZE', prata: 'PRATA', ouro: 'OURO', arcoiris: 'ARCO-ÍRIS', fogo: 'FOGO' },
     moldurasComo: { bronze: 'VENÇA 1 FASE', prata: 'VENÇA 3 FASES', ouro: 'AS 3 MOEDAS DE UMA FASE', arcoiris: '10 MISSÕES', fogo: 'VENÇA UM DEMÔNIO' },
     treino: 'TREINO',
@@ -249,9 +251,26 @@ const TEXTOS = {
   },
 };
 
+// Idioma: o escolhido nas configurações; senão o do navegador (português → pt, o resto → en).
+const Idioma = {
+  atual: CONFIG.idioma,
+  escolher(salvo) {
+    let id = salvo;
+    if (id !== 'pt' && id !== 'en') {
+      const nav = (typeof navigator !== 'undefined' && navigator.language) || '';
+      id = !nav || /^pt/i.test(nav) ? 'pt' : 'en';
+    }
+    if (!TEXTOS[id]) id = 'pt';
+    Idioma.atual = id;
+    if (typeof document !== 'undefined' && document.documentElement) document.documentElement.lang = id === 'pt' ? 'pt-BR' : 'en';
+    return id;
+  },
+};
+
 function t(chave, valores) {
-  const tabela = TEXTOS[CONFIG.idioma] || TEXTOS.pt;
-  let s = chave.split('.').reduce((o, k) => (o ? o[k] : undefined), tabela);
+  const busca = (tab) => chave.split('.').reduce((o, k) => (o ? o[k] : undefined), tab);
+  let s = busca(TEXTOS[Idioma.atual] || TEXTOS.pt);
+  if (typeof s !== 'string') s = busca(TEXTOS.pt);       // faltou no idioma: usa o português
   if (s === undefined) s = chave;
   if (valores) for (const k in valores) s = s.split('{' + k + '}').join(String(valores[k]));
   return s;
@@ -1068,7 +1087,7 @@ UI.telas.fases = (() => {
     C.botao({ x: 402, y: CART.y + CART.h / 2 - 20, w: 26, h: 40, icone: Sprites.desenho('setaDir', PAL.branco), acao: () => mudar(1) });
     const pri = C.botao({ x: 180, y: 216, w: 120, h: 22, texto: t('jogar'), escala: 2, primario: true, cor: PAL.alma, acao: jogar });
     C.botao({ x: 330, y: 6, w: 64, h: 16, texto: t('criar'), icone: Sprites.desenho('lapis', PAL.branco), acao: () => { Sound.sfx('confirmar'); Game.irPara('criadas'); } });
-    C.botao({ x: 72, y: 6, w: 76, h: 16, texto: t('infinito'), cor: PAL.ouro, acao: () => { Sound.sfx('confirmar'); Game.infinito(); } });
+    C.botao({ x: 100, y: 6, w: 76, h: 16, texto: t('infinito'), cor: PAL.ouro, acao: () => { Sound.sfx('confirmar'); Game.infinito(); } });
     C.botao({ x: 306, y: 218, w: 66, h: 20, texto: t('treino'), icone: Sprites.desenho('bandeira', PAL.verde), acao: () => jogar(true) });
     C.botao({ x: 14, y: 218, w: 80, h: 20, texto: t('visual'), icone: Sprites.desenho('cabide', PAL.branco), acao: () => { Sound.sfx('confirmar'); Game.irPara('visual'); } });
     C.botao({ x: 386, y: 218, w: 80, h: 20, texto: t('missoes'), icone: Sprites.desenho('trofeu', PAL.ouro), acao: () => { Sound.sfx('confirmar'); Game.irPara('missoes'); } });
@@ -1257,6 +1276,14 @@ UI.telas.config = (() => {
     y += 22;
     C.botao({ x: x + rot, y: y - 2, w: 60, h: 14, texto: () => (copiadoT > Game.tempo - 1.5 ? t('copiado') : t('copiar')), acao: copiarErros });
     C.botao({ x: x + rot + 66, y: y - 2, w: 50, h: 14, texto: t('limpar'), acao: () => Erros.limpar() });
+    C.botao({ x: 372, y: 8, w: 100, h: 14, texto: t('outroIdioma'), cor: PAL.ouro, acao: () => {
+      Save.config.idioma = Idioma.atual === 'pt' ? 'en' : 'pt';
+      Idioma.escolher(Save.config.idioma);
+      Save.gravar();
+      const girar = document.getElementById('girar');
+      if (girar) girar.lastChild.textContent = t('girarCelular');
+      montar();
+    } });
     const voltar = C.botao({ x: 180, y: 238, w: 120, h: 18, texto: '← ' + t('voltar'), primario: true, cor: PAL.alma, acao: sair });
     C.focar(voltar);
     C.focar(C.itens[0]);

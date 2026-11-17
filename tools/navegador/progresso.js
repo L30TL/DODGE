@@ -6,7 +6,7 @@ const path = require('path'), os = require('os');
 const PASTA = process.argv[2] || os.tmpdir();
 (async () => {
   const browser = await chromium.launch({ args: ['--autoplay-policy=no-user-gesture-required'] });
-  const page = await browser.newPage({ viewport: { width: 960, height: 540 } });
+  const page = await browser.newPage({ viewport: { width: 960, height: 540 }, locale: 'pt-BR' });
   const erros = [];
   page.on('pageerror', e => erros.push(e.message));
   page.on('console', m => { if (m.type() === 'error') erros.push(m.text()); });
@@ -26,7 +26,7 @@ const PASTA = process.argv[2] || os.tmpdir();
   const conferir = (ok, msg) => { console.log((ok ? 'ok   ' : 'FALHOU ') + msg); if (!ok) falhas.push(msg); };
 
   const mig = await page.evaluate(() => ({ v: Save.dados.versao, moedas: Save.dados.moedas, melhor: Save.dados.fases.despertar.melhor }));
-  conferir(mig.v === 3 && mig.moedas === 75 && mig.melhor === 60, `save v2 migrou com as moedas do que já tinha (${JSON.stringify(mig)})`);
+  conferir(mig.v === 4 && mig.moedas === 75 && mig.melhor === 60, `save v2 migrou (até a versão atual) com as moedas do que já tinha (${JSON.stringify(mig)})`);
   await clicar(240, 135, 400);
   await page.evaluate(() => Game.irPara('fases')); await page.waitForTimeout(200);
   await foto('1-fases');

@@ -168,3 +168,10 @@ Encontrados na auditoria da Etapa 0 (17/11/2026). "Sonda" = teste de navegador q
 - **Causa:** a posição em loop fazia o módulo da duração também nos valores negativos.
 - **Correção:** em loop, a posição só dá a volta depois que a música começou (negativo continua negativo, e o jogo segura o tempo).
 - **Teste:** `tools/navegador/sessao5.js` › INFINITO começa na volta 1.
+
+## B24 — Rótulo "EFEITOS" das configurações virava um grupo de textos · corrigido (0.6.0)
+- **Encontrado:** na Sessão 5, montando a tradução (o rótulo do volume dos efeitos sumiu da lista de textos).
+- **Reproduzir:** abrir Configurações depois da Sessão 5 (parte 1): o rótulo do volume dos efeitos mostrava um objeto em vez do texto.
+- **Causa:** o grupo novo dos efeitos de nick foi criado com a mesma chave (`efeitos`) do rótulo antigo; no objeto TEXTOS a segunda chave apagou a primeira.
+- **Correção:** o grupo virou `efeitosNick`.
+- **Teste:** `tests/textos.test.js` agora exige que toda chave completa usada em `t()` seja um texto (não um grupo), e confere o inglês chave por chave.

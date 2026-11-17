@@ -1034,6 +1034,7 @@ const Game = (() => {
     ctx.imageSmoothingEnabled = false;
     Save.carregar();
     Save.instalar();
+    Idioma.escolher(Save.config.idioma);
     Criadas.carregar();
     Criadas.instalar();
     // missões de hoje e conquistas do que já foi feito antes (save antigo); grava só se mudou

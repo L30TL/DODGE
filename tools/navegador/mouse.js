@@ -2,7 +2,7 @@
 const { chromium } = require('playwright');
 (async () => {
   const browser = await chromium.launch({ args: ['--autoplay-policy=no-user-gesture-required'] });
-  const page = await browser.newPage({ viewport: { width: 960, height: 540 } });   // 2 px de tela = 1 px lógico
+  const page = await browser.newPage({ viewport: { width: 960, height: 540 }, locale: 'pt-BR' });   // 2 px de tela = 1 px lógico
   const erros = []; page.on('pageerror', e => erros.push(e.message));
   await page.goto((process.env.DODGE_URL || 'http://127.0.0.1:8000') + '/?debug=1');
   await page.mouse.click(480, 270); await page.waitForTimeout(300);

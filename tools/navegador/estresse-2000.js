@@ -2,7 +2,7 @@
 const { chromium } = require('playwright');
 (async () => {
   const browser = await chromium.launch({ args: ['--autoplay-policy=no-user-gesture-required'] });
-  const ctx = await browser.newContext({ viewport: { width: 960, height: 540 } });
+  const ctx = await browser.newContext({ viewport: { width: 960, height: 540 }, locale: 'pt-BR' });
   const page = await ctx.newPage();
   const erros = []; page.on('pageerror', e => erros.push(e.message));
   await page.addInitScript(() => {

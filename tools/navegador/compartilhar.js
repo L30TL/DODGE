@@ -6,7 +6,7 @@ const path = require('path'), os = require('os');
 const PASTA = process.argv[2] || os.tmpdir();
 (async () => {
   const browser = await chromium.launch({ args: ['--autoplay-policy=no-user-gesture-required'] });
-  const ctx = await browser.newContext({ viewport: { width: 960, height: 540 }, permissions: ['clipboard-read', 'clipboard-write'] });
+  const ctx = await browser.newContext({ viewport: { width: 960, height: 540 }, locale: 'pt-BR', permissions: ['clipboard-read', 'clipboard-write'] });
   const page = await ctx.newPage();
   const erros = [];
   page.on('pageerror', e => erros.push(e.message));

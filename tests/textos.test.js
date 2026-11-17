@@ -37,7 +37,25 @@ test('toda chave usada em t(...) existe em TEXTOS', () => {
       const chave = m[1].endsWith('.') ? m[1].slice(0, -1) : m[1];      // t('grupo.' + x): confere o grupo
       const v = chave.split('.').reduce((o, k) => (o ? o[k] : undefined), T);
       if (v === undefined) faltando.push(`${arq}: ${m[1]}`);
+      // chave completa (sem o ponto do fim) tem que ser texto, não um grupo (B24)
+      else if (!m[1].endsWith('.') && typeof v !== 'string') faltando.push(`${arq}: ${m[1]} é um grupo, não um texto`);
     }
   }
   assert.deepStrictEqual(faltando, []);
+});
+
+test('inglês: as mesmas chaves do português, com os mesmos {marcadores}', () => {
+  const { carregar } = require('./carregar');
+  const ctx = carregar(['config.js', 'ui.js', 'textos-en.js'], { document: {}, Input: {}, Sound: {}, Levels: {}, Save: {}, Game: {}, Avatar: {} });
+  const T = ctx.pegar('TEXTOS');
+  const plano = (o, p = '', out = {}) => { for (const k in o) { if (typeof o[k] === 'object') plano(o[k], p + k + '.', out); else out[p + k] = o[k]; } return out; };
+  const pt = plano(T.pt), en = plano(T.en);
+  const problemas = [];
+  for (const k in pt) {
+    if (!(k in en)) { problemas.push('falta em inglês: ' + k); continue; }
+    const marcas = (s) => (s.match(/\{\w+\}/g) || []).sort().join();
+    if (marcas(pt[k]) !== marcas(en[k])) problemas.push('marcadores diferentes: ' + k);
+  }
+  for (const k in en) if (!(k in pt)) problemas.push('sobrando em inglês: ' + k);
+  assert.deepStrictEqual(problemas, []);
 });

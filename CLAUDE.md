@@ -4,7 +4,7 @@ Jogo arcade 2D de navegador: uma alma presa numa caixa desvia de ataques que cae
 
 ## Fase atual
 - **Fase 1** (núcleo): completa e no ar em https://l30tl.github.io/DODGE/ (GitHub Pages, branch `main`).
-- **OVERHAUL** (veja `DESIGN.md › OVERHAUL`): Etapa 0 (auditoria) concluída e aprovada. **Sessão 1 (fundação) concluída em 17/11/2026** (versão 0.2.0-dev): simulação pura, render separado, save v2, captura de erros, validador, 24 testes, bugs B01–B17, B19, B20 corrigidos (B18 fica pra Etapa 5). **Sessão 2 (editor) concluída em 17/11/2026** (0.3.0-dev): modificadores da caixa (encolher, girar, escurecer, inverter, espelho) no motor, editor completo (linha do tempo com a música, ímã, paleta, inspetor, prévia, tocar, testar daqui, desfazer, salvamento automático), Minhas Fases, B21. **Sessão 3 concluída** (0.4.0-dev): verificar vencendo do começo + solver, código curto de compartilhar e importar, filtro de palavrão, jogar fases criadas, B22. **Sessão 4 concluída** (0.5.0-dev): moedas comuns, guarda-roupa/loja/coleção, avatar em 7 camadas, 16 conquistas, missões diárias/semanais, save v3. **Próxima: Sessão 5** (modo treino, modo infinito, inglês, Demons destravados por estrelas, efeitos de nick/emblemas/molduras). Histórico em `CHANGELOG.md`, bugs em `BUGS.md`.
+- **OVERHAUL** (veja `DESIGN.md › OVERHAUL`): Etapa 0 (auditoria) concluída e aprovada. **Sessão 1 (fundação) concluída em 17/11/2026** (versão 0.2.0-dev): simulação pura, render separado, save v2, captura de erros, validador, 24 testes, bugs B01–B17, B19, B20 corrigidos (B18 fica pra Etapa 5). **Sessão 2 (editor) concluída em 17/11/2026** (0.3.0-dev): modificadores da caixa (encolher, girar, escurecer, inverter, espelho) no motor, editor completo (linha do tempo com a música, ímã, paleta, inspetor, prévia, tocar, testar daqui, desfazer, salvamento automático), Minhas Fases, B21. **Sessão 3 concluída** (0.4.0-dev): verificar vencendo do começo + solver, código curto de compartilhar e importar, filtro de palavrão, jogar fases criadas, B22. **Sessão 4 concluída** (0.5.0-dev): moedas comuns, guarda-roupa/loja/coleção, avatar em 7 camadas, 16 conquistas, missões diárias/semanais, save v3. **Sessão 5 concluída** (0.6.0-dev): treino com checkpoints, modo infinito, inglês, Demons travados por estrelas, perfil (nick, efeitos, emblemas, molduras), save v4, B23–B24. **Próxima: Sessão 6** (resto da Etapa 1: solver novo, estresse, fuzzing, casos de borda, painel F3, navegadores) — **e aí para pra você testar**. Histórico em `CHANGELOG.md`, bugs em `BUGS.md`.
 
 ## Plano do overhaul por sessão
 Ordem combinada: o que falta do roadmap original entra antes das etapas novas; a fundação da Etapa 1 vem primeiro porque o editor, o solver e os testes dependem dela.
@@ -38,12 +38,14 @@ HTML5 Canvas + JavaScript puro, sem frameworks e sem build. Scripts clássicos c
 | `filtro.js` | `Filtro` | PURO: filtro de palavrão (nomes) |
 | `codigo.js` | `Codigo` | PURO: código curto de compartilhar fase (`DG1Z.…`), gerar e ler com todas as proteções |
 | `progresso.js` | `Progresso` | PURO: economia (moedas comuns), missões diárias/semanais, conquistas, loja |
-| `save.js` | `Save` | Save v2 (`dodge.save`): migrações, backup, recuperação de corrompido, mescla entre abas, regras de progresso (`registrarMorte`, `registrarVitoria`) |
-| `ui.js` | `TEXTOS`, `t()`, `PAL`, `Fonte`, `Sprites`, `UI`, `Controles` | Textos, paleta, fonte pixel própria, ícones, botões/sliders e telas de menu (título, fases, config, calibração) |
+| `save.js` | `Save` | Save v4 (`dodge.save`): migrações, backup, recuperação de corrompido, mescla entre abas, regras de progresso (`registrarMorte`, `registrarVitoria`) |
+| `textos-en.js` | `TEXTOS.en` | Todos os textos em inglês (mesmas chaves do `TEXTOS.pt`) |
+| `ui.js` | `TEXTOS`, `t()`, `Idioma`, `PAL`, `Fonte`, `Sprites`, `UI`, `Controles` | Textos, paleta, fonte pixel própria, ícones, botões/sliders e telas de menu (título, fases, config, calibração) |
 | `audio.js` | `Sound` | Sequenciador chiptune (pulso 25%/12,5%, triangular, ruído, bumbo), músicas, efeitos, relógio do jogo |
 | `avatar.js` | `Avatar` | A alma como dado: uma camada `{ peca, cor }` por categoria (corpo, padrão, olhos, boca, cabeça, extra, rastro); catálogo de peças com preço ou trava |
 | `input.js` | `Input` | Teclado (setas/WASD) e arrasto em qualquer lugar da tela (mouse 1:1, dedo com sensibilidade, ancorado no toque) |
 | `patterns.js` | `Patterns` | PURO: validador de fases, os 7 padrões → specs analíticas, pool do tamanho do pico, colisão (SDF) |
+| `infinito.js` | `Infinito` | PURO: gerador do modo infinito (um segmento por volta da música, por semente) |
 | `sim.js` | `Sim` | PURO: `Sim.Corrida` = uma tentativa (movimento, sub-passos, raspão, moedas, morte, vitória). Jogo, bots e testes usam a mesma |
 | `render.js` | `Render` | Desenho dos ataques (avisos, balas — em camada de pixels quando são muitas —, lasers, paredes, moedas, hitboxes) |
 | `levels.js` | `Levels` | Fases como dados `{ id, nome, autor, dificuldade, musica, bpm, duracaoBatidas, eventos }` |
@@ -65,7 +67,7 @@ Abrir http://localhost:8000. Debug: http://localhost:8000/?debug=1
 
 Testes (precisa de Node; nenhuma biblioteca):
 ```bash
-node --test                              # 57 testes, ~45 s
+node --test                              # 62 testes, ~60 s
 node tools/verificar-fases.js            # prova que as fases são vencíveis + bots
 DETALHE=1 node tools/verificar-fases.js prensa
 node tools/navegador/regressao.js        # com o servidor ligado; precisa do Playwright
@@ -73,6 +75,7 @@ node tools/navegador/editor.js           # o editor de ponta a ponta (criar, edi
 node tools/navegador/modificadores.js    # caixa girada/encolhida/escura/invertida/espelhada
 node tools/navegador/compartilhar.js     # verificar vencendo, código, importar, filtro, jogar fase criada
 node tools/navegador/progresso.js        # save v2→v3, moedas jogando, missões, conquista, loja
+node tools/navegador/sessao5.js          # treino (checkpoints), perfil, modo infinito
 ```
 
 ## Regras de trabalho

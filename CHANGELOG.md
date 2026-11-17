@@ -2,6 +2,27 @@
 
 O que mudou em cada versão. Bugs com número (B01…) estão detalhados em `BUGS.md`.
 
+## 0.6.0-dev — Overhaul, Sessão 5: treino, infinito, inglês, perfil (17/11/2026)
+
+### Modos
+- **TREINO** (botão ao lado do JOGAR): C ou a bandeira marca um checkpoint (o tempo e onde a alma está); cada morte recomeça dele; V tira o último. Nada conta (recorde, tentativas, moedas, missões, mapa de mortes).
+- **INFINITO**: a música (Correnteza) toca em loop e cada volta gera um trecho novo, um pouco mais difícil (nível sobe por 6 voltas). Nada cruza a virada, a alma continua de onde está. O recorde é o tempo aguentado. Os trechos são gerados por semente e o solver prova que são possíveis.
+- **Demônios** só abrem com estrelas (20★); o cartão mostra o cadeado e quantas faltam.
+
+### Perfil (só visual)
+- Em VISUAL › PERFIL: **nick** (com filtro de palavrão), **efeito do nick** (cor, degradê, onda, brilho, arco-íris, faíscas), **emblema** (cada conquista vira um) e **moldura** (bronze, prata, ouro, arco-íris, fogo, liberadas por marcos).
+
+### Inglês
+- O jogo inteiro em inglês. Escolhe sozinho pelo idioma do navegador (português → PT, o resto → EN) e troca nas configurações (botão no canto).
+
+### Técnico
+- Save v4 (perfil, recorde do infinito, idioma) com migração da v3.
+- `infinito.js` (gerador puro), `textos-en.js`; teste confere o inglês chave por chave e os {marcadores}.
+
+### Correções
+- Música em loop: antes da 1ª nota a posição "dava a volta" pro fim (B23).
+- Rótulo "EFEITOS" das configurações tinha virado um grupo de textos (B24).
+
 ## 0.5.0-dev — Overhaul, Sessão 4: progressão (17/11/2026)
 
 ### Moedas e loja (só visual!)
