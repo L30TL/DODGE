@@ -335,7 +335,8 @@ const Debug = (() => {
     }
     c.fillStyle = '#9c9cc4';
     c.font = '10px monospace';
-    c.fillText(f.nome + ' · ' + m.reduce((a, b) => a + b, 0) + ' mortes · pico ' + m.indexOf(max) + '%', 4, 10);
+    const total = m.reduce((a, b) => a + b, 0);
+    c.fillText(f.nome + ' · ' + total + ' mortes' + (total ? ' · pico em ' + m.indexOf(max) + '%' : ''), 4, 10);
   }
 
   function desenharGrafico(a) {
