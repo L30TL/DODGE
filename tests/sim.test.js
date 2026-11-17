@@ -84,7 +84,7 @@ test('raspão e moeda contam uma vez só', () => {
 });
 
 test('todas as fases oficiais compilam sem avisos e são vencíveis pelo analisador', { timeout: 120000 }, () => {
-  const D = carregar(['config.js', 'patterns.js', 'sim.js', 'levels.js', 'debug.js']);
+  const D = carregar(['config.js', 'patterns.js', 'sim.js', 'levels.js', 'solver.js', 'debug.js']);
   for (const f of D.Levels.FASES) {
     const a = D.pegar('Debug').analisar(f);
     assert.ok(a.ok, `${f.id} impossível em ${a.morreuEm}`);
@@ -158,7 +158,7 @@ test('espelho: o reflexo também morre (e a morte é no lugar do reflexo)', () =
 });
 
 test('o analisador entende a caixa encolhida, o empurrão da parede e o espelho', { timeout: 120000 }, () => {
-  const D = carregar(['config.js', 'patterns.js', 'sim.js', 'levels.js', 'debug.js']).pegar('Debug');
+  const D = carregar(['config.js', 'patterns.js', 'sim.js', 'levels.js', 'solver.js', 'debug.js']).pegar('Debug');
   const meio = { batida: 8, tipo: 'laser', pos: 0, orient: 'v', larg: 60, aviso: 2, dur: 1 };   // |x| < ~31
   assert.ok(D.analisar(fase40('a1', [meio])).ok, 'caixa normal: dá pra fugir pro lado');
   const a2 = D.analisar(fase40('a2', [{ batida: 2, tipo: 'caixa', largura: 0.2, dur: 0 }, meio]));

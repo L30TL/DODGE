@@ -12,7 +12,7 @@ const path = require('path');
 
 const raiz = path.join(__dirname, '..');
 const ctx = vm.createContext({ console, Math, Uint8Array, Float32Array, Array, Object, JSON, Infinity, performance: { now: () => Date.now() } });
-for (const f of ['config.js', 'patterns.js', 'sim.js', 'levels.js', 'debug.js']) {
+for (const f of ['config.js', 'patterns.js', 'sim.js', 'levels.js', 'solver.js', 'debug.js']) {
   vm.runInContext(fs.readFileSync(path.join(raiz, f), 'utf8'), ctx, { filename: f });
 }
 const ids = process.argv.slice(2);

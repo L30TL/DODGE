@@ -108,8 +108,11 @@ test('lixeira: apagar e trazer de volta; duplicar cria uma fase nova e não veri
   C.salvar(g, true);
   const d = C.duplicar(f.id, 'Cópia');
   assert.notStrictEqual(d.id, f.id);
-  assert.strictEqual(d.verificada, null);
+  assert.strictEqual(d.verificada, null);                 // a "verificação" da original era falsa
   assert.strictEqual(d.eventos.length, 2);
+  g.verificada = { hash: C.hashJogo(g), data: 1 };
+  C.salvar(g, true);
+  assert.ok(C.verificada(C.duplicar(f.id, 'Cópia 2')));   // verificada de verdade: a cópia também é
   // a lixeira tem limite
   for (let i = 0; i < 15; i++) C.apagar(C.nova(op).id);
   assert.ok(C.dados.lixeira.length <= 10);

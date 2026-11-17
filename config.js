@@ -9,7 +9,7 @@
 // =============================================================================
 
 const CONFIG = {
-  versao: '0.3.0-dev',     // versão do jogo (aparece na tela inicial e no registro de erros)
+  versao: '0.4.0-dev',     // versão do jogo (aparece na tela inicial e no registro de erros)
 
   // ---------------------------------------------------------------- tela -----
   tela: {
@@ -145,6 +145,13 @@ const CONFIG = {
     escalaPrevia: 0.72,     // tamanho da caixa na prévia (1 = tamanho do jogo)
     passoPos: 0.05,         // quanto uma posição anda em cada toque nas setinhas
     imaDistPx: 6,           // px — distância em que o ímã puxa pra nota da música
+    solverMsPorFrame: 10,   // ms — quanto o solver trabalha por frame ao verificar (a tela não trava)
+  },
+
+  // ------------------------------------------------------------- código -----
+  codigo: {
+    maxTexto: 200000,       // caracteres — código maior que isso nem é lido
+    maxBytes: 1000000,      // bytes depois de descompactar (proteção contra código "bomba")
   },
 
   // ------------------------------------------------------------- limites -----

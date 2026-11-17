@@ -178,6 +178,7 @@ const Game = (() => {
     J.ataques = J.corrida.at;
     J.recomecarAoContinuar = false; J.avisoAudio = false; J.audioParado = 0;
     J.musica = Sound.info(fase.musica);
+    J.voltar = fase.criada ? 'criadas' : 'fases';       // fase do editor volta pra Minhas Fases
     J.cor = COR_DIFICULDADE[fase.dificuldade] || PAL.alma;
     J.temMoedas = J.comp.specs.some(s => s.k === Patterns.TIPOS.MOEDA);
     J.trapaca = false;
@@ -405,7 +406,8 @@ const Game = (() => {
       J.teste.vitoria = { doInicio: J.inicio === 0 && !J.trapaca, tentativas: J.teste.reg.tentativas, moedas: Array.from(J.corrida.moedas) };
     } else {
       const reg = Save.fase(J.fase.id);
-      J.ganhouEstrelas = Save.registrarVitoria(reg, J.corrida.moedas, J.trapaca, J.fase.dificuldade).estrelas;
+      // fase criada não dá estrela (estrela é das oficiais)
+      J.ganhouEstrelas = Save.registrarVitoria(reg, J.corrida.moedas, J.trapaca, J.fase.criada ? null : J.fase.dificuldade).estrelas;
       if (!J.trapaca && Levels.indice(J.fase.id) === 0) Save.dados.primeiraVez = false;
       Save.gravar();
     }
@@ -433,11 +435,11 @@ const Game = (() => {
     }
     const prox = Levels.proxima(J.fase.id);
     const pri = C.botao({ x: pX + 70, y: 198, w: 160, h: 20, texto: prox ? t('proxima') : t('fases'), primario: true, cor: PAL.ouro,
-      acao: () => { if (prox) jogar(prox); else irPara('fases'); } });
+      acao: () => { if (prox) jogar(prox); else irPara(J.voltar); } });
     C.botao({ x: pX + 24, y: 226, w: 120, h: 16, texto: t('repetir'), icone: Sprites.desenho('repetir', PAL.branco),
       acao: () => { J.textoMorte = null; J.controles.limpar(); comecarTentativa(); } });
     C.botao({ x: pX + 156, y: 226, w: 120, h: 16, texto: t('fases'), icone: Sprites.desenho('lista', PAL.branco),
-      acao: () => irPara('fases') });
+      acao: () => irPara(J.voltar) });
     C.focar(pri);
   }
 
@@ -458,7 +460,7 @@ const Game = (() => {
     C.botao({ x, y: 128, w: 150, h: 16, texto: t('reiniciar'), acao: () => { C.limpar(); comecarTentativa(); } });
     C.botao({ x, y: 150, w: 150, h: 16, texto: t('configuracoes'), acao: () => irPara('config', { voltar: 'jogo' }) });
     if (J.teste) C.botao({ x, y: 172, w: 150, h: 16, texto: t('editor.editorVoltar'), icone: Sprites.desenho('lapis', PAL.branco), acao: () => irPara('editor') });
-    else C.botao({ x, y: 172, w: 150, h: 16, texto: t('sair'), acao: () => irPara('fases') });
+    else C.botao({ x, y: 172, w: 150, h: 16, texto: t('sair'), acao: () => irPara(J.voltar) });
     C.focar(pri);
   }
 
@@ -770,7 +772,7 @@ const Game = (() => {
     c.fillStyle = PAL.preto; c.globalAlpha = 0.4;
     c.fillRect(pX + 70 - 18 + Math.round(pulo / 2), 156, 36 - pulo, 3); c.globalAlpha = 1;
     // estrelas
-    const nEst = J.teste ? 0 : Levels.estrelasDe(J.fase.dificuldade);
+    const nEst = J.teste || J.fase.criada ? 0 : Levels.estrelasDe(J.fase.dificuldade);
     const sx = pX + 140;
     for (let i = 0; i < nEst; i++) UI.sprite(c, Sprites.estrela(true), sx + i * 16, 78, 2);
     if (J.teste) UI.texto(c, t('editor.venceuTeste'), sx - 6, 81, { cor: PAL.ouro });
@@ -786,7 +788,7 @@ const Game = (() => {
     UI.texto(c, String(J.tentativa), pX + pW - 14, 128, { alinhar: 'direita', cor: PAL.branco });
     UI.texto(c, t('vitoriaRaspoes'), sx, 144, { cor: PAL.cinzaClaro });
     UI.texto(c, String(J.raspoes), pX + pW - 14, 144, { alinhar: 'direita', cor: PAL.branco });
-    if (!J.teste && !Levels.proxima(J.fase.id)) UI.texto(c, t('maisFasesEmBreve'), CX, 176, { alinhar: 'centro', cor: PAL.almaClara });
+    if (!J.teste && !J.fase.criada && !Levels.proxima(J.fase.id)) UI.texto(c, t('maisFasesEmBreve'), CX, 176, { alinhar: 'centro', cor: PAL.almaClara });
     c.restore();
     if (ease >= 1) J.controles.desenhar(c, tempo);
   }

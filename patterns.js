@@ -52,6 +52,8 @@ const Patterns = (() => {
     espelho: { ativo: 'bool', eixo: ['x', 'y', 'xy'] },
   };
   const DIFICULDADES = ['facil', 'normal', 'dificil', 'dificilimo', 'insano', 'demonio'];
+  // "tem a chave" sem olhar o protótipo: tipo '__proto__', 'constructor' ou 'toString' não é evento (B22)
+  const tem = (obj, k) => typeof k === 'string' && Object.prototype.hasOwnProperty.call(obj, k);
   const ehNum = (v) => typeof v === 'number' && Number.isFinite(v);
 
   function limparParam(regra, v) {
@@ -107,7 +109,7 @@ const Patterns = (() => {
     let total = 0;
     for (let i = 0; i < evs.length && i < L.maxEventos; i++) {
       const ev = evs[i];
-      if (!ev || typeof ev !== 'object' || !ESQUEMA[ev.tipo]) { avisos.push(`evento ${i}: tipo desconhecido`); continue; }
+      if (!ev || typeof ev !== 'object' || !tem(ESQUEMA, ev.tipo)) { avisos.push(`evento ${i}: tipo desconhecido`); continue; }
       if (!ehNum(ev.batida) || ev.batida < 0 || ev.batida > out.duracaoBatidas + 64) { avisos.push(`evento ${i}: batida inválida`); continue; }
       const limpo = { batida: ev.batida, tipo: ev.tipo };
       const regras = Object.assign({}, COMUNS, ESQUEMA[ev.tipo]);
@@ -160,8 +162,8 @@ const Patterns = (() => {
       },
     };
     fase.eventos.forEach((ev, idx) => {
-      if (MODIFICADORES[ev.tipo]) return;          // viram trilhas (abaixo)
-      const g = GERADORES[ev.tipo];
+      if (tem(MODIFICADORES, ev.tipo)) return;     // viram trilhas (abaixo)
+      const g = tem(GERADORES, ev.tipo) ? GERADORES[ev.tipo] : null;
       if (!g) { if (typeof console !== 'undefined') console.warn('[Dodge] tipo de evento desconhecido:', ev.tipo); return; }
       g(ev, C, idx);
     });
@@ -181,7 +183,7 @@ const Patterns = (() => {
   function montarTrilhas(eventos, C) {
     const tr = { largura: [], altura: [], angulo: [], escuro: [], raio: [], invX: [], invY: [], espelho: [] };
     const avisosMod = [];
-    const lista = eventos.map((ev, idx) => ({ ev, idx })).filter(x => MODIFICADORES[x.ev.tipo])
+    const lista = eventos.map((ev, idx) => ({ ev, idx })).filter(x => tem(MODIFICADORES, x.ev.tipo))
       .sort((a, b) => a.ev.batida - b.ev.batida || a.idx - b.idx);
     const raioPadrao = CONFIG.caixa.raioLuz;
     const tween = (trilha, padrao, t0, dur, para) => {

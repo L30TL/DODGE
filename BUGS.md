@@ -154,3 +154,10 @@ Encontrados na auditoria da Etapa 0 (17/11/2026). "Sonda" = teste de navegador q
 - **Causa:** o modo normal fazia `(ev.centro || 0) * largura`; com uma lista de 2+ valores isso dá `NaN` (o modo "buraco" já tratava lista).
 - **Correção:** o modo normal usa o primeiro valor da lista.
 - **Teste:** `tests/padroes.test.js` › paredes com centro em lista têm posição de verdade.
+
+## B22 — Evento com tipo "__proto__" ou "constructor" passava pelo validador · corrigido (0.3.0)
+- **Encontrado:** na Sessão 3, nos testes de código de compartilhar malicioso.
+- **Reproduzir:** uma fase (ou código) com `{ tipo: '__proto__' }` ou `{ tipo: 'toString' }`. O validador achava o "tipo" no protótipo do objeto e deixava passar; a compilação tentava chamar o protótipo como gerador e quebrava (ou tratava `toString` como modificador da caixa).
+- **Causa:** a busca do tipo usava `ESQUEMA[tipo]` / `GERADORES[tipo]` sem conferir se a chave é do próprio objeto.
+- **Correção:** toda busca de tipo usa `hasOwnProperty` (`tem(obj, k)` no `patterns.js`).
+- **Teste:** `tests/codigo.test.js` › código malicioso (e o fuzz de `tests/padroes.test.js` agora também sorteia esses tipos).

@@ -119,6 +119,27 @@ const TEXTOS = {
       testeTitulo: 'TESTE',
       editorVoltar: 'EDITOR',
       venceuTeste: 'VOCÊ VENCEU SUA FASE!',
+      importar: 'IMPORTAR',
+      colarCodigo: 'COLE O CÓDIGO DA FASE',
+      codigoDaFase: 'CÓDIGO DA FASE: COPIE E MANDE PRA QUEM QUISER',
+      copiarCodigo: 'COPIAR',
+      codigoCopiado: 'CÓDIGO COPIADO!',
+      compartilhar: 'COMPARTILHAR',
+      importada: 'FASE IMPORTADA!',
+      nomeImportado: 'FASE IMPORTADA',
+      nomeProibido: 'ESSE NOME NÃO PODE. ESCOLHA OUTRO',
+      deCodigo: 'CÓDIGO',
+      verificada: 'VERIFICADA',
+      naoVerificada: 'NÃO VERIFICADA',
+      vencaDoComeco: 'VENÇA DO COMEÇO PRA VERIFICAR',
+      precisaVerificar: 'ABRA NO EDITOR E VENÇA DO COMEÇO PRA COMPARTILHAR',
+      conferindo: 'CONFERINDO SE A FASE É POSSÍVEL... {n}%',
+      verificadaOk: 'FASE VERIFICADA! JÁ DÁ PRA COMPARTILHAR',
+      impossivelTeclado: 'NO TECLADO NÃO DÁ PRA PASSAR PERTO DA BATIDA {n}',
+      gerandoCodigo: 'GERANDO O CÓDIGO...',
+      errosCodigo: { formato: 'ISSO NÃO É UM CÓDIGO DE FASE', incompleto: 'CÓDIGO INCOMPLETO (COPIOU TUDO?)',
+        versao: 'CÓDIGO DE UMA VERSÃO MAIS NOVA DO JOGO', grande: 'CÓDIGO GRANDE DEMAIS',
+        invalido: 'CÓDIGO ESTRAGADO', navegador: 'ESTE NAVEGADOR NÃO ABRE ESSE CÓDIGO' },
       ima: 'ÍMÃ: {modo}',
       imas: { q: '1/4', m: '1/2', b: 'BATIDA', bumbo: 'BUMBO', caixa: 'CAIXA', melodia: 'MELODIA', livre: 'LIVRE' },
       musicas: { despertar: 'DESPERTAR', correnteza: 'CORRENTEZA', prensa: 'PRENSA' },
@@ -478,6 +499,8 @@ const Sprites = (() => {
     lixo: ['.###.', '#####', '.....', '#.#.#', '#.#.#', '#.#.#', '.###.'],
     copia: ['####.', '#..#.', '#.####', '#.#..#', '###..#', '..#..#', '..####'],
     ima: ['##.##', '##.##', '#...#', '#...#', '#...#', '.###.', '.....'],
+    compartilhar: ['...#...', '..###..', '.#.#.#.', '...#...', '#..#..#', '#.....#', '#######'],
+    interrogacao: ['.###.', '#...#', '....#', '...#.', '..#..', '.....', '..#..'],
     // tipos de evento (paleta e linha do tempo)
     ev_chuva: ['#..#..#', '#..#..#', '.......', '.#..#..', '.#..#..', '.......', '#..#..#'],
     ev_fogo: ['##.....', '.......', '....##.', '.......', '##.....', '.......', '....##.'],
@@ -605,7 +628,8 @@ const UI = {
 // Só aceita caracteres que a fonte do jogo sabe desenhar.
 const EntradaTexto = (() => {
   let caixa = null, campo = null, titulo = null, ok = null, cancelar = null, atual = null;
-  function limpar(txt, max) {
+  function limpar(txt, max, cru) {
+    if (cru) return String(txt).replace(/\s+/g, '').slice(0, max);
     let out = '';
     for (const ch of String(txt).toUpperCase()) if (Fonte.suporta(ch)) out += ch;
     return out.replace(/\s+/g, ' ').slice(0, max);
@@ -615,7 +639,7 @@ const EntradaTexto = (() => {
     const a = atual; atual = null;
     caixa.style.display = 'none';
     campo.blur();
-    if (confirmou) a.aoConfirmar && a.aoConfirmar(limpar(campo.value, a.max).trim());
+    if (confirmou) a.aoConfirmar && a.aoConfirmar(limpar(campo.value, a.max, a.cru).trim());
     else a.aoCancelar && a.aoCancelar();
   }
   function criar() {
@@ -637,25 +661,38 @@ const EntradaTexto = (() => {
       else if (e.key === 'Escape') { e.preventDefault(); fechar(false); }
     });
     campo.addEventListener('input', () => {
-      const l = limpar(campo.value, atual ? atual.max : 40);
+      if (!atual || atual.cru) return;
+      const l = limpar(campo.value, atual.max);
       if (l !== campo.value) campo.value = l;
     });
+    campo.addEventListener('focus', () => { if (atual && atual.somenteLeitura) campo.select(); });
   }
   return {
-    // op = { titulo, valor, max, aoConfirmar(texto), aoCancelar() }
+    // op = { titulo, valor, max, aoConfirmar(texto), aoCancelar(),
+    //        cru (código: sem maiúsculas nem filtro de letras), somenteLeitura, textoOk, textoCancelar }
     pedir(op) {
       if (!caixa) criar();
       atual = Object.assign({ max: CONFIG.limites.maxTexto }, op);
       titulo.textContent = op.titulo || '';
-      ok.textContent = t('editor.ok');
-      cancelar.textContent = t('editor.cancelar');
+      ok.textContent = op.textoOk || t('editor.ok');
+      cancelar.textContent = op.textoCancelar || t('editor.cancelar');
       campo.maxLength = atual.max;
-      campo.value = limpar(op.valor || '', atual.max);
+      campo.readOnly = !!op.somenteLeitura;
+      campo.style.textTransform = op.cru ? 'none' : 'uppercase';
+      campo.style.fontSize = op.cru ? '13px' : '18px';
+      campo.value = limpar(op.valor || '', atual.max, op.cru);
       caixa.style.display = 'flex';
       setTimeout(() => { campo.focus(); campo.select(); }, 30);
     },
     aberta() { return !!atual; },
     fechar() { fechar(false); },
+    // copia o texto da caixa (botão COPIAR do código); devolve uma promessa de true/false
+    copiar() {
+      const txt = campo ? campo.value : '';
+      const reserva = () => { try { campo.select(); return document.execCommand('copy'); } catch (e) { return false; } };
+      if (navigator.clipboard && navigator.clipboard.writeText) return navigator.clipboard.writeText(txt).then(() => true, reserva);
+      return Promise.resolve(reserva());
+    },
     limpar,
   };
 })();

@@ -264,6 +264,33 @@ if (typeof UI !== 'undefined') {
   const corEscuraDoTipo = (tipo) => (tipo === 'moeda' ? PAL.ouroEscuro : Editor.ehMod(tipo) ? PAL.roxoEscuro : PAL.perigoEscuro);
   const nomeMusica = (id) => t('editor.musicas.' + id);
 
+  // Mostra o código de uma fase verificada (ou diz o que falta). aviso(txt) = mensagem rápida da tela.
+  function compartilharFase(f, aviso) {
+    if (!Criadas.verificada(f)) { aviso(t('editor.precisaVerificar')); Sound.sfx('voltar'); return; }
+    aviso(t('editor.gerandoCodigo'));
+    Codigo.gerar(f, true).then((codigo) => {
+      EntradaTexto.pedir({ titulo: t('editor.codigoDaFase'), valor: codigo, cru: true, somenteLeitura: true,
+        max: CONFIG.codigo.maxTexto, textoOk: t('editor.copiarCodigo'), textoCancelar: t('editor.fechar'),
+        aoConfirmar: () => { EntradaTexto.copiar().then((ok) => { if (ok) aviso(t('editor.codigoCopiado')); }); } });
+      // o botão COPIAR fecha a caixa; o texto continua na área de transferência
+    }).catch((e) => { Erros.registrar(e, 'codigo/gerar'); });
+  }
+
+  // Lê um código colado e guarda a fase. Devolve uma promessa com a fase nova (ou null).
+  function importarCodigo(txt, aviso) {
+    return Codigo.ler(txt).then((r) => {
+      if (!r.ok) { aviso(t('editor.errosCodigo.' + r.erro)); Sound.sfx('voltar'); return null; }
+      const d = Editor.dadosMusica(Sound.info(r.fase.musica));
+      let nome = EntradaTexto.limpar(r.fase.nome, CONFIG.limites.maxTexto).trim();
+      if (!nome || Filtro.temPalavrao(nome)) nome = t('editor.nomeImportado');
+      const f = Criadas.nova({ nome, musica: r.fase.musica, bpm: d.bpm, duracaoBatidas: d.duracaoBatidas,
+        dificuldade: r.fase.dificuldade, eventos: r.fase.eventos, origem: 'codigo', verificada: r.verificada });
+      aviso(t('editor.importada'));
+      Sound.sfx('confirmar');
+      return f;
+    }).catch((e) => { Erros.registrar(e, 'codigo/ler'); return null; });
+  }
+
   // Dados novos pra uma fase com essa música.
   function faseNova(musica) {
     const d = Editor.dadosMusica(Sound.info(musica));
@@ -298,6 +325,8 @@ if (typeof UI !== 'undefined') {
       tocando: false, hist: new Editor.Historico(),
       arrasto: null, alvo: null, modal: null, confirmar: false,
       msg: null, msgT: -9, inspScroll: 0, inspAltura: 0, copiado: null,
+      testeHash: null,          // conteúdo testado do começo (pra verificar se vencer)
+      verificando: null,        // { analise, hash }: o solver conferindo depois da vitória
     };
 
     // ------------------------------------------------------------ estado --
@@ -453,10 +482,11 @@ if (typeof UI !== 'undefined') {
     }
     const alternarTocar = () => (ed.tocando ? parar() : tocar());
 
-    function testar() {
+    function testar(doComeco) {
       parar();
       salvarAgora();
-      const desde = ed.cursor >= ed.dur - 1 ? 0 : ed.cursor * ed.B;
+      const desde = doComeco || ed.cursor >= ed.dur - 1 ? 0 : ed.cursor * ed.B;
+      ed.testeHash = desde === 0 ? Criadas.hashJogo(ed.fase) : null;
       Game.testar(Criadas.jogavel(ed.fase), desde);
     }
 
@@ -469,7 +499,32 @@ if (typeof UI !== 'undefined') {
 
     function renomear() {
       EntradaTexto.pedir({ titulo: t('editor.nomeDaFase'), valor: ed.fase.nome, max: CONFIG.limites.maxTexto,
-        aoConfirmar: (txt) => { if (!txt || txt === ed.fase.nome) return; registrar(); ed.fase.nome = txt; mudou(); } });
+        aoConfirmar: (txt) => {
+          if (!txt || txt === ed.fase.nome) return;
+          if (Filtro.temPalavrao(txt)) { aviso(t('editor.nomeProibido')); Sound.sfx('voltar'); return; }
+          registrar(); ed.fase.nome = txt; mudou();
+        } });
+    }
+
+    // Depois de vencer do começo no teste: o solver confere se dá pra passar no teclado.
+    function verificar() {
+      ed.verificando = { analise: Solver.Analise(Criadas.jogavel(ed.fase)), hash: Criadas.hashJogo(ed.fase) };
+      montar();
+    }
+    function fimVerificacao() {
+      const v = ed.verificando, r = v.analise.resultado;
+      ed.verificando = null;
+      if (r.ok && v.hash === Criadas.hashJogo(ed.fase)) {
+        ed.fase.verificada = { hash: v.hash, data: Date.now() };
+        Criadas.salvar(ed.fase, true);
+        aviso(t('editor.verificadaOk'));
+        Sound.sfx('vitoria');
+      } else if (!r.ok) {
+        aviso(t('editor.impossivelTeclado', { n: Math.floor(r.morreuEm / ed.B) }));
+        moverCursor(Math.max(0, r.morreuEm / ed.B - 2));
+        Sound.sfx('voltar');
+      }
+      montar();
     }
 
     function trocarMusica(dir) {
@@ -497,11 +552,14 @@ if (typeof UI !== 'undefined') {
       if (ed.modal === 'props') { montarProps(ic); return; }
       // barra de cima
       C.botao({ x: 4, y: 3, w: 20, h: 16, icone: ic('setaEsq'), acao: sair });
-      C.botao({ x: 28, y: 3, w: 186, h: 16, texto: () => ed.fase.nome, icone: ic('lapis', PAL.cinzaClaro), acao: renomear });
+      C.botao({ x: 28, y: 3, w: 164, h: 16, texto: () => ed.fase.nome, icone: ic('lapis', PAL.cinzaClaro), acao: renomear });
+      const ver = Criadas.verificada(ed.fase);
+      C.botao({ x: 196, y: 3, w: 20, h: 16, icone: ver ? ic('check', PAL.ouro) : ic('interrogacao', PAL.cinza),
+        acao: () => { if (ver) aviso(t('editor.verificada')); else { aviso(t('editor.vencaDoComeco')); moverCursor(0); testar(true); } } });
       C.botao({ x: 254, y: 3, w: 20, h: 16, icone: ic('desfazer'), desabilitado: !ed.hist.podeDesfazer, acao: () => desfazer(false) });
       C.botao({ x: 276, y: 3, w: 20, h: 16, icone: ic('refazer'), desabilitado: !ed.hist.podeRefazer, acao: () => desfazer(true) });
       C.botao({ x: 302, y: 3, w: 24, h: 16, icone: ed.tocando ? ic('pausa') : ic('tocar'), acao: alternarTocar });
-      C.botao({ x: 330, y: 3, w: 120, h: 16, texto: t('editor.testar'), icone: ic('tocar', PAL.preto), primario: true, cor: PAL.alma, acao: testar });
+      C.botao({ x: 330, y: 3, w: 120, h: 16, texto: t('editor.testar'), icone: ic('tocar', PAL.preto), primario: true, cor: PAL.alma, acao: () => testar(false) });
       C.botao({ x: 454, y: 3, w: 22, h: 16, icone: ic('engrenagem'), acao: () => { parar(); ed.modal = 'props'; ed.confirmar = false; montar(); } });
       // ferramentas da linha do tempo
       const fy = L.ferr.y;
@@ -527,6 +585,8 @@ if (typeof UI !== 'undefined') {
           Criadas.apagar(id);
           Game.irPara('criadas', { apagada: id });
         } });
+      C.botao({ x: x + 10, y: y + 88, w: w - 20, h: 16, texto: t('editor.compartilhar'), icone: ic('compartilhar'),
+        cor: PAL.ouro, acao: () => { salvarAgora(); compartilharFase(ed.fase, aviso); } });
       const f = C.botao({ x: x + w - 90, y: y + 112, w: 80, h: 16, texto: t('editor.fechar'), primario: true, cor: PAL.alma,
         acao: () => { ed.modal = null; montar(); } });
       C.focar(f);
@@ -913,12 +973,18 @@ if (typeof UI !== 'undefined') {
         ed.tocando = false;
         ed.arrasto = null; ed.alvo = null;
         if (ed.sujo || args.de === 'jogo') recompilar();
+        const v = args.de === 'jogo' && Game.J.teste && Game.J.teste.vitoria;
+        if (v) {
+          Game.J.teste.vitoria = null;
+          if (v.doInicio && ed.testeHash && ed.testeHash === Criadas.hashJogo(ed.fase) && !Criadas.verificada(ed.fase)) verificar();
+        }
         montar();
       },
       sair() { Input.atalhos = false; parar(); EntradaTexto.fechar(); salvarAgora(); },
       estado: () => ed,          // pros testes de navegador
 
       atualizar(dt) {
+        if (ed.verificando && ed.verificando.analise.avancar(CONFIG.editor.solverMsPorFrame)) fimVerificacao();
         if (ed.sujo) recompilar();
         if (ed.tocando) {
           let tt = Sound.posicao();
@@ -936,6 +1002,10 @@ if (typeof UI !== 'undefined') {
 
       evento(e) {
         if (EntradaTexto.aberta()) return;
+        if (ed.verificando) {
+          if (e.t === 'tecla' && e.code === 'Escape') { ed.verificando = null; montar(); }
+          return;
+        }
         if (e.t === 'tecla') { tecla(e); return; }
         if (e.t === 'roda') { roda(e); return; }
         if (e.t === 'down') { apertar(e); return; }
@@ -954,6 +1024,13 @@ if (typeof UI !== 'undefined') {
         UI.texto(c, st, 146, L.ferr.y + 3, { cor: Criadas.disponivel ? PAL.cinza : PAL.perigoClaro });
         if (ed.modal === 'props') desenharProps(c);
         else C.desenhar(c, Game.tempo);
+        if (ed.verificando) {
+          const p = ed.verificando.analise.progresso;
+          c.globalAlpha = 0.75; c.fillStyle = PAL.preto; c.fillRect(0, 0, W, CONFIG.tela.altura); c.globalAlpha = 1;
+          UI.painel(c, 110, 110, 260, 44, { fundo: PAL.fundo2, borda: PAL.ouro });
+          UI.texto(c, t('editor.conferindo', { n: Math.floor(p * 100) }), 240, 120, { alinhar: 'centro', cor: PAL.ouro });
+          UI.barra(c, 124, 136, 232, 6, p, PAL.ouro, PAL.fundo3);
+        }
         const u = Game.tempo - ed.msgT;
         if (ed.msg && u < 1.6) {
           c.globalAlpha = u < 1.2 ? 1 : (1.6 - u) / 0.4;
@@ -1081,7 +1158,7 @@ if (typeof UI !== 'undefined') {
         case 'Delete': case 'Backspace': apagarSel(); break;
         case 'Home': moverCursor(0); break;
         case 'End': moverCursor(ed.dur); break;
-        case 'KeyT': testar(); break;
+        case 'KeyT': testar(false); break;
         case 'KeyM': ed.ima = Editor.IMAS[(Editor.IMAS.indexOf(ed.ima) + 1) % Editor.IMAS.length]; aviso(t('editor.ima', { modo: t('editor.imas.' + ed.ima) })); break;
         case 'Equal': case 'NumpadAdd': zoom(1.5); break;
         case 'Minus': case 'NumpadSubtract': zoom(1 / 1.5); break;
@@ -1109,6 +1186,16 @@ if (typeof UI !== 'undefined') {
     }
 
     function editar(f) { Sound.sfx('confirmar'); Game.irPara('editor', { fase: f }); }
+    function jogar(f) { Sound.sfx('confirmar'); Game.jogar(Criadas.jogavel(f)); }
+    let msg = null, msgT = -9;
+    const aviso = (txt) => { msg = txt; msgT = Game.tempo; };
+    function importar() {
+      EntradaTexto.pedir({ titulo: t('editor.colarCodigo'), valor: '', cru: true, max: CONFIG.codigo.maxTexto,
+        textoOk: t('editor.importar'), aoConfirmar: (txt) => {
+          if (!txt) return;
+          importarCodigo(txt, aviso).then((f) => { if (f) { rolagem = 0; montar(); } });
+        } });
+    }
 
     function montar() {
       C.limpar();
@@ -1116,11 +1203,15 @@ if (typeof UI !== 'undefined') {
       C.botao({ x: 4, y: 6, w: 20, h: 16, icone: ic('setaEsq'), acao: () => { Sound.sfx('voltar'); Game.irPara('fases'); } });
       const pri = C.botao({ x: 356, y: 6, w: 120, h: 16, texto: t('editor.nova'), icone: ic('mais', PAL.preto), primario: true, cor: PAL.alma,
         acao: () => editar(faseNova(Criadas.MUSICAS[0])) });
+      C.botao({ x: 268, y: 6, w: 82, h: 16, texto: t('editor.importar'), icone: ic('copia'), acao: importar });
       const l = Criadas.lista();
       rolagem = Math.max(0, Math.min(Math.max(0, l.length - VIS), rolagem));
       l.slice(rolagem, rolagem + VIS).forEach((f, k) => {
         const y = CART.y + k * (CART.h + CART.gap);
-        C.botao({ x: CART.x + CART.w - 118, y: y + 10, w: 60, h: 16, texto: t('editor.editar'), icone: ic('lapis'), cor: PAL.alma, acao: () => editar(f) });
+        C.botao({ x: CART.x + CART.w - 160, y: y + 10, w: 54, h: 16, texto: t('jogar'), icone: ic('tocar'), cor: PAL.alma, acao: () => jogar(f) });
+        C.botao({ x: CART.x + CART.w - 102, y: y + 10, w: 22, h: 16, icone: ic('lapis'), acao: () => editar(f) });
+        C.botao({ x: CART.x + CART.w - 78, y: y + 10, w: 22, h: 16, icone: ic('compartilhar', Criadas.verificada(f) ? PAL.ouro : PAL.cinza),
+          acao: () => compartilharFase(f, aviso) });
         C.botao({ x: CART.x + CART.w - 54, y: y + 10, w: 22, h: 16, icone: ic('copia'),
           acao: () => { Criadas.duplicar(f.id, EntradaTexto.limpar(t('editor.copiaDe', { nome: f.nome }), CONFIG.limites.maxTexto)); Sound.sfx('confirmar'); rolagem = 0; montar(); } });
         C.botao({ x: CART.x + CART.w - 28, y: y + 10, w: 22, h: 16, icone: ic('lixo', PAL.perigoClaro),
@@ -1171,14 +1262,19 @@ if (typeof UI !== 'undefined') {
           UI.painel(c, CART.x, y, CART.w, CART.h, { fundo: PAL.fundo2, borda: PAL.cinza });
           c.fillStyle = COR_DIFICULDADE[f.dificuldade]; c.fillRect(CART.x + 1, y + 1, 3, CART.h - 2);
           UI.sprite(c, Sprites.iconeDificuldade(f.dificuldade), CART.x + 10, y + 7, 2);
-          UI.texto(c, f.nome, CART.x + 40, y + 8, { cor: PAL.branco });
-          const sub = [nomeMusica(f.musica), t('dificuldades.' + f.dificuldade), t('editor.eventos', { n: f.eventos.length }),
-            t('editor.editadaHa', { quando: quando(f.editada) })].join(' · ');
+          const wNome = UI.texto(c, f.nome, CART.x + 40, y + 8, { cor: PAL.branco });
+          if (Criadas.verificada(f)) c.drawImage(Sprites.desenho('check', PAL.ouro), CART.x + 44 + wNome, y + 8);
+          const sub = [nomeMusica(f.musica), t('dificuldades.' + f.dificuldade), f.origem === 'codigo' ? t('editor.deCodigo') : quando(f.editada)].join(' · ');
           UI.texto(c, sub, CART.x + 40, y + 21, { cor: PAL.cinzaClaro });
         });
         if (l.length > VIS) UI.texto(c, (rolagem + 1) + '-' + Math.min(l.length, rolagem + VIS) + ' / ' + l.length, 284, 239, { cor: PAL.cinza });
         if (apagada && tm - apagadaT < 6) UI.texto(c, t('editor.apagada'), 284, 255, { alinhar: 'direita', cor: PAL.cinzaClaro, sombra: PAL.preto });
         C.desenhar(c, tm);
+        if (msg && tm - msgT < 2.2) {
+          const w = UI.largura(msg) + 12;
+          c.fillStyle = PAL.preto; c.fillRect(Math.round(240 - w / 2), 226, w, 13);
+          UI.texto(c, msg, 240, 229, { alinhar: 'centro', cor: PAL.ouro });
+        }
       },
     };
   })();

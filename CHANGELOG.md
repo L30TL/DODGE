@@ -2,6 +2,23 @@
 
 O que mudou em cada versão. Bugs com número (B01…) estão detalhados em `BUGS.md`.
 
+## 0.4.0-dev — Overhaul, Sessão 3: verificar, compartilhar, filtro (17/11/2026)
+
+### Fases criadas
+- **Verificar vencendo:** pra compartilhar, o criador vence a própria fase **do começo** no teste (o selo ✓/? ao lado do nome testa do começo). Depois da vitória, o **solver** confere sozinho se dá pra passar no teclado; se não der, mostra a batida do problema.
+- Mexeu em algo que muda o jogo (eventos, música, dificuldade), a verificação cai e precisa vencer de novo. Mudar o nome não tira.
+- **Código curto pra compartilhar** (`DG1Z.…`): a fase inteira compactada, com soma de verificação. Botão COPIAR. Uma fase pequena dá ~150 caracteres.
+- **Importar código** em Minhas Fases: código cortado, de versão mais nova, estragado ou malicioso (bomba de compactação, campos absurdos) dá um aviso claro e não importa nada.
+- **Filtro de palavrão** nos nomes de fase (pega P0RR4, P.U.T.A, MEEERDA...; não pega COMPUTADOR, TEMPORADA, PORTA...). Nome de código importado com palavrão vira "FASE IMPORTADA".
+- **Jogar** as fases criadas direto de Minhas Fases (recorde e tentativas contam; estrela é só das oficiais). Sair ou vencer volta pra Minhas Fases.
+
+### Técnico
+- `solver.js`: o analisador saiu do `debug.js` e roda aos poucos (o editor confere sem travar a tela). Paredes andando 9× mais rápido (Prensa: 29 s → 3 s, mesmo resultado).
+- `codigo.js` (código de compartilhar) e `filtro.js` (palavrão), com testes.
+
+### Correções
+- Evento com tipo "__proto__", "constructor" ou "toString" passava pelo validador (B22).
+
 ## 0.3.0-dev — Overhaul, Sessão 2: editor (17/11/2026)
 
 ### Mecânicas novas (eventos de fase)

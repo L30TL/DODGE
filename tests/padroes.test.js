@@ -41,7 +41,7 @@ test('fases malucas nunca travam nem geram NaN (fuzzing do validador)', () => {
     const op = [NaN, Infinity, -Infinity, -1e9, 1e9, 'abc', null, undefined, {}, [], [NaN, 2, 'x'], true, rnd() * 4 - 2, Math.round(rnd() * 20)];
     return op[Math.floor(rnd() * op.length)];
   };
-  const tipos = Object.keys(Patterns.ESQUEMA).concat(['naoExiste', '', null]);
+  const tipos = Object.keys(Patterns.ESQUEMA).concat(['naoExiste', '', null, '__proto__', 'constructor', 'toString']);
   for (let k = 0; k < 400; k++) {
     const evs = [];
     const n = Math.floor(rnd() * 30);

@@ -132,6 +132,18 @@ const Criadas = (() => {
   }
 
   const copia = (f) => JSON.parse(JSON.stringify(f));
+
+  // Soma rápida de um texto (FNV-1a de 32 bits, em base 36).
+  function hash(txt) {
+    let h = 0x811c9dc5;
+    for (let i = 0; i < txt.length; i++) { h ^= txt.charCodeAt(i); h = Math.imul(h, 0x01000193); }
+    return (h >>> 0).toString(36);
+  }
+  // O que importa pra jogar (nome não): mudou isso, a fase precisa ser vencida de novo.
+  function hashJogo(f) {
+    const v = Patterns.validar(f).fase;
+    return hash(JSON.stringify([v.musica, v.bpm, v.duracaoBatidas, v.dificuldade, v.eventos]));
+  }
   function novoId() {
     let r = '';
     for (let i = 0; i < 4; i++) r += Math.floor(Math.random() * 36).toString(36);
@@ -145,7 +157,9 @@ const Criadas = (() => {
     armazenamento: null,          // testes podem trocar por um falso
     agora: () => Date.now(),      // testes podem trocar o relógio
     VERSAO, CHAVE, CHAVE_BACKUP, PREFIXO_CORROMPIDO, MUSICAS,
-    novo, completar, migrar, mesclar, limparFase,
+    novo, completar, migrar, mesclar, limparFase, hash, hashJogo,
+    // a fase foi vencida pelo criador do jeito que está agora?
+    verificada(f) { return !!(f && f.verificada && f.verificada.hash === hashJogo(f)); },
 
     carregar() {
       C.recuperado = null;
@@ -206,6 +220,7 @@ const Criadas = (() => {
       const f = limparFase({ id: novoId(), nome: op.nome, autor: '', dificuldade: op.dificuldade || 'facil',
         musica: op.musica, bpm: op.bpm, duracaoBatidas: op.duracaoBatidas, eventos: op.eventos || [],
         criada: agora, editada: agora, origem: op.origem });
+      if (op.verificada) f.verificada = { hash: hashJogo(f), data: agora };
       C.dados.fases.push(f);
       C.gravar();
       return copia(f);
@@ -244,7 +259,8 @@ const Criadas = (() => {
     duplicar(id, nome) {
       const f = C.pegar(id);
       if (!f) return null;
-      return C.nova(Object.assign(copia(f), { nome, origem: 'editor' }));
+      // a cópia é verificada só se a original é (mesmo conteúdo já vencido)
+      return C.nova(Object.assign(copia(f), { nome, origem: 'editor', verificada: C.verificada(f) }));
     },
 
     // A fase pronta pra jogar (validada, como as oficiais).
