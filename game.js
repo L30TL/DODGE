@@ -147,6 +147,8 @@ const Game = (() => {
     dica: { ativa: false, movido: 0 },
     corrida: null,           // Sim.Corrida da fase atual (a lógica pura)
     teste: null,             // testando uma fase do editor: { reg, vitoria } — nada vai pro save
+    moedasGanhas: 0,         // moedas comuns ganhas nesta tentativa
+    tempoJogado: 0,          // s jogados ainda não somados na progressão
     inicio: 0,               // de onde cada tentativa começa (s): 0, ou o ponto escolhido no editor
     audioParado: 0, avisoAudio: false, recomecarAoContinuar: false,
     controles: new Controles(),
@@ -199,6 +201,42 @@ const Game = (() => {
     return pTela;
   }
 
+  // =========================================================== AVISOS ======
+  // Fila de avisos no topo da tela (conquista, missão completa). Aparecem em qualquer tela.
+  const notas = [];
+  function notificar(txt, cor, icone) {
+    notas.push({ txt, cor: cor || PAL.ouro, icone: icone || null, ini: -1 });
+    if (notas.length > 6) notas.shift();
+  }
+  function desenharNotas(c) {
+    const n = notas[0];
+    if (!n) return;
+    if (n.ini < 0) { n.ini = tempo; Sound.sfx('recorde'); }
+    const u = tempo - n.ini, dur = CONFIG.progressao.avisoS;
+    if (u > dur) { notas.shift(); return; }
+    const entra = Math.min(1, u * 6, (dur - u) * 6);
+    const w = UI.largura(n.txt) + (n.icone ? 24 : 14), y = Math.round(-18 + 24 * entra);
+    c.fillStyle = PAL.preto; c.fillRect(Math.round(CX - w / 2) + 2, y + 2, w, 16);
+    UI.painel(c, Math.round(CX - w / 2), y, w, 16, { fundo: PAL.fundo2, borda: n.cor });
+    if (n.icone) c.drawImage(n.icone, Math.round(CX - w / 2) + 6, y + 4);
+    UI.texto(c, n.txt, Math.round(CX - w / 2) + (n.icone ? 18 : 7), y + 5, { cor: n.cor });
+  }
+
+  // Um acontecimento pra progressão (missões, conquistas). Avisa o que completou.
+  function progresso(ev) {
+    const r = Progresso.registrar(Save.dados, ev, Date.now());
+    for (const cq of r.conquistas) notificar(t('conquistaNova', { nome: t('conquistas.' + cq.id + '.nome') }), PAL.ouro, Sprites.desenho('trofeu', PAL.ouro));
+    for (const m of r.missoes) notificar(t('missaoFeita'), PAL.verde, Sprites.desenho('check', PAL.verde));
+    if (r.conquistas.length || r.missoes.length) Save.gravarDepois();
+    return r;
+  }
+  // Moedas e missões só nas fases oficiais, sem debug e fora do teste do editor.
+  const contaProgresso = () => !J.teste && J.fase && !J.fase.criada && !J.fase.debug && !J.trapaca;
+  function ganharMoedas(n) {
+    if (!contaProgresso() || !(n > 0)) return;
+    J.moedasGanhas += Progresso.ganhar(Save.dados, n);
+  }
+
   // Registro da fase no save. No teste do editor é um de mentira: nada é salvo.
   function regAtual() { return J.teste ? J.teste.reg : Save.fase(J.fase.id); }
 
@@ -222,6 +260,8 @@ const Game = (() => {
     J.melhorAntes = reg.melhor;
     J.passouMelhor = false;
     J.raspoes = 0; J.combo = 0; J.ultimoRaspao = -9;
+    J.moedasGanhas = 0;
+    if (contaProgresso()) progresso({ tipo: 'tentativa' });
     J.recorde = false;
     J.textoTentativa = tempo;
     alma.x = 0; alma.y = 0; alma.vx = 0; alma.vy = 0; alma.susto = 0;
@@ -304,6 +344,8 @@ const Game = (() => {
         Sound.sfx('passouMelhor');
       }
       if (J.dica.ativa && J.dica.movido > 30) J.dica.ativa = false;
+      J.tempoJogado += dt;
+      somarTempo(false);
     } else if (J.estado === 'morto') {
       pega.reancorar = true;
       const espera = J.recorde ? CONFIG.morte.atrasoReinicioRecorde : CONFIG.morte.atrasoReinicio;
@@ -332,10 +374,25 @@ const Game = (() => {
     }
   }
 
+  // Tempo jogado entra na progressão de tempos em tempos (e ao morrer/vencer).
+  function somarTempo(agora) {
+    if (!contaProgresso()) { J.tempoJogado = 0; return; }
+    if (J.tempoJogado >= CONFIG.economia.tempoLote || (agora && J.tempoJogado >= 1)) {
+      const n = Math.floor(J.tempoJogado);
+      J.tempoJogado -= n;
+      progresso({ tipo: 'tempo', n });
+    }
+  }
+
   function raspar(o) {
     J.raspoes++;
     if (!J.teste) Save.dados.stats.raspoes++;
     J.combo = tempo - J.ultimoRaspao < CONFIG.raspao.janelaCombo ? J.combo + 1 : 1;
+    if (contaProgresso()) {
+      ganharMoedas(CONFIG.economia.raspao);
+      progresso({ tipo: 'raspao' });
+      if (J.combo > 1) progresso({ tipo: 'combo', n: J.combo });
+    }
     J.ultimoRaspao = tempo;
     alma.susto = 0.25;
     Sound.sfx('raspao', 0, J.combo - 1);
@@ -351,6 +408,7 @@ const Game = (() => {
   }
 
   function pegarMoeda(s) {
+    if (contaProgresso()) progresso({ tipo: 'secreta' });
     Sound.sfx('moeda');
     const p = naTela(s.x, s.y);
     Particulas.explosao(p.x, p.y, 16, PAL.ouro, 70, 0.5);
@@ -372,7 +430,10 @@ const Game = (() => {
       J.recorde = false;
       reg.melhor = Math.max(reg.melhor, pct);
     } else {
-      J.recorde = Save.registrarMorte(reg, pct, J.trapaca).recorde;
+      const rm = Save.registrarMorte(reg, pct, J.trapaca);
+      J.recorde = rm.recorde;
+      if (J.recorde) ganharMoedas(Progresso.doRecorde(rm.antes, pct));
+      if (contaProgresso()) { progresso({ tipo: 'morte', pct, dificuldade: J.fase.dificuldade }); somarTempo(true); }
       if (J.recorde) {
         setTimeout(() => Sound.sfx('recorde'), 140);
         Save.gravar();                   // recorde não pode se perder se o app fechar agora (B04)
@@ -407,7 +468,13 @@ const Game = (() => {
     } else {
       const reg = Save.fase(J.fase.id);
       // fase criada não dá estrela (estrela é das oficiais)
-      J.ganhouEstrelas = Save.registrarVitoria(reg, J.corrida.moedas, J.trapaca, J.fase.criada ? null : J.fase.dificuldade).estrelas;
+      const rv = Save.registrarVitoria(reg, J.corrida.moedas, J.trapaca, J.fase.criada ? null : J.fase.dificuldade);
+      J.ganhouEstrelas = rv.estrelas;
+      if (contaProgresso()) {
+        ganharMoedas(Progresso.doRecorde(rv.antes, 100) + Progresso.daVitoria(rv.primeira, J.fase.dificuldade));
+        progresso({ tipo: 'vitoria', dificuldade: J.fase.dificuldade });
+        somarTempo(true);
+      }
       if (!J.trapaca && Levels.indice(J.fase.id) === 0) Save.dados.primeiraVez = false;
       Save.gravar();
     }
@@ -615,19 +682,25 @@ const Game = (() => {
     if (J.estado === 'vitoria') desenharVitoria(c);
   }
 
+  const ARCOIRIS = ['#ff4d4d', '#ff9f43', '#ffd23f', '#3ddc84', '#4df3ff', '#4d7cff', '#c04dff'];
   function desenharAlma(c) {
     // rastro
     if (!reduzido()) {
-      const cor = Avatar.corPrincipal();
-      c.fillStyle = cor;
+      const ra = Avatar.rastro();
+      c.fillStyle = ra.cor;
       const n = alma.rastro.length;
       for (let i = 0; i < n; i++) {
         const r = alma.rastro[(alma.rastroI + i) % n];
         const k = i / n;
         if (Math.abs(r.x - alma.x) + Math.abs(r.y - alma.y) < 2) continue;
         c.globalAlpha = 0.08 + 0.25 * k;
-        const s = 3 + Math.round(k * 4);
-        c.fillRect(Math.round(r.x - s / 2), Math.round(r.y - s / 2), s, s);
+        const s = 3 + Math.round(k * 4), x = Math.round(r.x), y = Math.round(r.y);
+        if (ra.estilo === 'arcoiris') { c.fillStyle = ARCOIRIS[(i + (frame >> 2)) % ARCOIRIS.length]; c.globalAlpha = 0.15 + 0.4 * k; }
+        if (ra.estilo === 'faiscas') { c.globalAlpha = (i + frame) % 3 ? 0.15 + 0.5 * k : 0; c.fillRect(x - 2, y, 5, 1); c.fillRect(x, y - 2, 1, 5); }
+        else if (ra.estilo === 'bolhas') {
+          const h = s >> 1;
+          c.fillRect(x - h, y - h - 1, s, 1); c.fillRect(x - h, y + h, s, 1); c.fillRect(x - h - 1, y - h, 1, s); c.fillRect(x + h, y - h, 1, s);
+        } else c.fillRect(Math.round(r.x - s / 2), Math.round(r.y - s / 2), s, s);
       }
       c.globalAlpha = 1;
     }
@@ -788,6 +861,7 @@ const Game = (() => {
     UI.texto(c, String(J.tentativa), pX + pW - 14, 128, { alinhar: 'direita', cor: PAL.branco });
     UI.texto(c, t('vitoriaRaspoes'), sx, 144, { cor: PAL.cinzaClaro });
     UI.texto(c, String(J.raspoes), pX + pW - 14, 144, { alinhar: 'direita', cor: PAL.branco });
+    if (J.moedasGanhas > 0) UI.texto(c, t('moedasGanhas', { n: J.moedasGanhas }), CX, 162, { alinhar: 'centro', cor: PAL.ouro });
     if (!J.teste && !J.fase.criada && !Levels.proxima(J.fase.id)) UI.texto(c, t('maisFasesEmBreve'), CX, 176, { alinhar: 'centro', cor: PAL.almaClara });
     c.restore();
     if (ease >= 1) J.controles.desenhar(c, tempo);
@@ -838,7 +912,7 @@ const Game = (() => {
       ctx.globalAlpha = 1;
       ctx.globalCompositeOperation = 'source-over';
     }
-    try { desenharAvisos(ctx); } catch (e) { /* o aviso nunca derruba o jogo */ }
+    try { desenharAvisos(ctx); desenharNotas(ctx); } catch (e) { /* o aviso nunca derruba o jogo */ }
     if (Debug.ativo) Debug.frame(dt, ms);
   }
 
@@ -879,6 +953,10 @@ const Game = (() => {
     Save.instalar();
     Criadas.carregar();
     Criadas.instalar();
+    // missões de hoje e conquistas do que já foi feito antes (save antigo)
+    Progresso.atualizarMissoes(Save.dados, Date.now());
+    for (const cq of Progresso.conferirConquistas(Save.dados, Date.now())) notificar(t('conquistaNova', { nome: t('conquistas.' + cq.id + '.nome') }), PAL.ouro);
+    Save.gravarDepois();
     Input.init(canvas);
     Input.destino = (e) => {
       if (e.t === 'down' || e.t === 'up' || e.t === 'tecla') Sound.iniciar();   // iOS só libera áudio em alguns eventos
@@ -901,7 +979,7 @@ const Game = (() => {
   }
 
   return {
-    init, irPara, jogar, testar, tremer, flash, desenharFundo, Particulas,
+    init, irPara, jogar, testar, tremer, flash, desenharFundo, Particulas, notificar, progresso,
     get tempo() { return tempo; },
     get frame() { return frame; },
     get nomeTela() { return nomeTela; },

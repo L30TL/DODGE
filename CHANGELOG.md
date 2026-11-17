@@ -2,6 +2,22 @@
 
 O que mudou em cada versão. Bugs com número (B01…) estão detalhados em `BUGS.md`.
 
+## 0.5.0-dev — Overhaul, Sessão 4: progressão (17/11/2026)
+
+### Moedas e loja (só visual!)
+- **Moedas comuns**: 1 por raspão, 1 por % novo de recorde, e pela vitória (1ª vez: 40 no Fácil até 300 no Demônio; de novo: 10). Só nas fases oficiais e sem debug (fase criada não vira fazenda de moedas).
+- Quem já jogava ganha na hora as moedas do que já tinha feito (recordes, vitórias, raspões).
+- **VISUAL** (guarda-roupa + loja + coleção): a alma montada em camadas — 4 corpos, 4 padrões, 4 olhos, 5 bocas, 7 coisas na cabeça, 5 extras e 4 rastros — e cor livre em cada camada (16 cores; rosa não pode no corpo porque rosa é perigo). Prova antes de comprar; o que falta aparece como silhueta com cadeado.
+- A alma nova aparece no jogo, com o rastro escolhido (normal, bolhas, faíscas, arco-íris). A hitbox é a mesma pra todo mundo.
+
+### Missões e conquistas
+- **MISSÕES**: 3 do dia e 2 da semana (iguais pra todo mundo no mesmo dia, trocam sozinhas na virada), com recompensa em moedas.
+- **16 conquistas** com moedas e peças raras (coroa, antena, xadrez, estrela, faíscas, arco-íris). Aviso no topo da tela quando libera; quem já tinha feito ganha na hora.
+
+### Técnico
+- Save v3 com migração da v2 (testada: nada se perde).
+- `progresso.js` (economia, missões, conquistas, loja: puro, com testes) e `profile.js` (telas VISUAL e MISSÕES).
+
 ## 0.4.0-dev — Overhaul, Sessão 3: verificar, compartilhar, filtro (17/11/2026)
 
 ### Fases criadas

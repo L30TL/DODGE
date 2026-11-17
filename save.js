@@ -16,7 +16,7 @@ const Save = (() => {
   const CHAVE_V1 = 'dodge.save.v1';           // formato da Fase 1 (não é apagado: vira backup)
   const CHAVE_BACKUP = 'dodge.save.backup';
   const PREFIXO_CORROMPIDO = 'dodge.save.corrompido.';
-  const VERSAO = 2;
+  const VERSAO = 3;
   let gravarPendente = null;
   let ultimoBackup = 0;
   const finito = Number.isFinite;
@@ -36,9 +36,21 @@ const Save = (() => {
         sensibilidadeToque: CONFIG.toque.sensibilidadePadrao,
       },
       fases: {},              // por id de fase: veja Save.fase()
-      stats: { tentativas: 0, raspoes: 0, mortes: 0, vitorias: 0, segundosJogados: 0 },
+      stats: { tentativas: 0, raspoes: 0, mortes: 0, vitorias: 0, segundosJogados: 0,
+        comboMax: 0, mortes99: 0, fasesCriadas: 0, fasesVerificadas: 0, pecasCompradas: 0, missoesFeitas: 0 },
       ultimaFase: null,
+      // v3: progressão (só visual)
+      moedas: 0,              // moedas comuns na carteira
+      moedasTotal: 0,         // ganhas desde sempre
+      pecas: pecasIniciais(), // peças de visual que a pessoa tem: { id: true }
+      conquistas: {},         // { id: quando foi liberada (ms) }
+      missoes: { dia: '', diarias: [], semana: '', semanais: [] },
     };
+  }
+  function pecasIniciais() {
+    const p = {};
+    for (const id of CONFIG.economia.pecasIniciais) p[id] = true;
+    return p;
   }
 
   function novaFase() {
@@ -55,6 +67,22 @@ const Save = (() => {
   // MIGRACOES[n] recebe um save na versão n e devolve na versão n+1.
   const MIGRACOES = {
     1: (d) => { d.rev = 0; d.versao = 2; return d; },   // v1 (Fase 1) → v2: contador de revisão
+    // v2 → v3: progressão. Quem já jogava recebe as moedas do que já fez (recordes, vitórias, raspões).
+    2: (d) => {
+      const E = CONFIG.economia;
+      let m = 0;
+      for (const id in d.fases || {}) {
+        const f = d.fases[id] || {};
+        const oficial = typeof Levels !== 'undefined' && Levels.FASES.find(x => x.id === id);
+        if (!oficial) continue;
+        m += (finito(f.melhor) ? Math.max(0, Math.min(100, f.melhor)) : 0) * E.porPct;
+        if (f.vitorias > 0) m += E.vitoria[oficial.dificuldade] || 0;
+      }
+      m += (d.stats && finito(d.stats.raspoes) ? d.stats.raspoes : 0) * E.raspao;
+      d.moedas = Math.round(m); d.moedasTotal = Math.round(m);
+      d.versao = 3;
+      return d;
+    },
   };
 
   function migrar(d) {
@@ -71,7 +99,22 @@ const Save = (() => {
     out.rev = inteiro(dados.rev, 0, 1e12, 0);
     out.primeiraVez = dados.primeiraVez !== false;
     out.ultimaFase = typeof dados.ultimaFase === 'string' ? dados.ultimaFase : null;
-    if (Array.isArray(dados.avatar)) out.avatar = dados.avatar;
+    if (Array.isArray(dados.avatar)) {
+      // camadas do visual: só o formato certo (peça desconhecida o Avatar ignora)
+      const camadas = dados.avatar.filter(c => c && typeof c.peca === 'string' && c.peca.length < 40 &&
+        typeof c.cor === 'string' && /^#[0-9a-f]{6}$/i.test(c.cor)).slice(0, 12).map(c => ({ peca: c.peca, cor: c.cor.toLowerCase() }));
+      if (camadas.length) out.avatar = camadas;
+    }
+    out.moedas = inteiro(dados.moedas, 0, 1e9, 0);
+    out.moedasTotal = Math.max(out.moedas, inteiro(dados.moedasTotal, 0, 1e9, 0));
+    for (const k in (dados.pecas || {})) if (dados.pecas[k] === true && k.length < 40) out.pecas[k] = true;
+    for (const k in (dados.conquistas || {})) if (finito(dados.conquistas[k]) && k.length < 40) out.conquistas[k] = dados.conquistas[k];
+    const mi = dados.missoes || {};
+    const lista = (l) => (Array.isArray(l) ? l : []).filter(x => x && typeof x.id === 'string').slice(0, 6).map(x => ({
+      id: x.id.slice(0, 30), alvo: inteiro(x.alvo, 1, 1e6, 1), moedas: inteiro(x.moedas, 0, 1e4, 0),
+      prog: finito(x.prog) ? Math.max(0, Math.min(1e6, x.prog)) : 0, pega: x.pega === true }));
+    out.missoes = { dia: typeof mi.dia === 'string' ? mi.dia.slice(0, 10) : '', diarias: lista(mi.diarias),
+      semana: typeof mi.semana === 'string' ? mi.semana.slice(0, 10) : '', semanais: lista(mi.semanais) };
     const c = dados.config || {};
     const vol = (v, def) => (finito(v) ? Math.max(0, Math.min(1, v)) : def);
     out.config.volumeMusica = vol(c.volumeMusica, out.config.volumeMusica);
@@ -104,6 +147,11 @@ const Save = (() => {
     out.rev = Math.max(a.rev || 0, b.rev || 0) + 1;
     out.primeiraVez = a.primeiraVez && b.primeiraVez;
     for (const k in out.stats) out.stats[k] = Math.max(a.stats[k] || 0, b.stats[k] || 0);
+    for (const x of [a, b]) {
+      for (const k in (x.pecas || {})) if (x.pecas[k] === true) out.pecas[k] = true;
+      for (const k in (x.conquistas || {})) if (!out.conquistas[k] || x.conquistas[k] < out.conquistas[k]) out.conquistas[k] = x.conquistas[k];
+    }
+    out.moedasTotal = Math.max(a.moedasTotal || 0, b.moedasTotal || 0);
     const ids = new Set(Object.keys(a.fases).concat(Object.keys(b.fases)));
     for (const id of ids) {
       const fa = a.fases[id] || novaFase(), fb = b.fases[id] || novaFase();
@@ -231,21 +279,23 @@ const Save = (() => {
       if (trapaca) return { recorde: false };
       reg.mortes[pct]++;
       S.dados.stats.mortes++;
-      const recorde = pct > reg.melhor;
+      const antes = reg.melhor;
+      const recorde = pct > antes;
       if (recorde) reg.melhor = pct;
-      return { recorde };
+      return { recorde, antes };
     },
 
     // Vitória: 100%, moedas pegas nesta tentativa ficam salvas, estrelas na 1ª vez.
     registrarVitoria(reg, moedas, trapaca, dificuldade) {
       if (trapaca) return { primeira: false, estrelas: 0, moedasNovas: 0 };
       const primeira = reg.vitorias === 0;
+      const antes = reg.melhor;
       reg.vitorias++;
       reg.melhor = 100;
       S.dados.stats.vitorias++;
       let moedasNovas = 0;
       for (let i = 0; i < 3; i++) if (moedas && moedas[i] && !reg.moedas[i]) { reg.moedas[i] = true; moedasNovas++; }
-      return { primeira, estrelas: primeira ? Levels.estrelasDe(dificuldade) : 0, moedasNovas };
+      return { primeira, antes, estrelas: primeira ? Levels.estrelasDe(dificuldade) : 0, moedasNovas };
     },
 
     // Total de estrelas ganhas (cada fase vencida dá as estrelas da sua dificuldade).

@@ -72,6 +72,61 @@ const TEXTOS = {
     vitoriaTentativas: 'TENTATIVAS',
     vitoriaRaspoes: 'RASPÕES',
     vitoriaMoedas: 'MOEDAS',
+    // ------------------------------------------------------- progressão
+    visual: 'VISUAL',
+    missoes: 'MISSÕES',
+    conquistasTitulo: 'CONQUISTAS {n}/{total}',
+    hoje: 'HOJE',
+    estaSemana: 'ESTA SEMANA',
+    trocaEm: 'TROCA EM {t}',
+    horasMin: '{h}H {m}MIN',
+    dias: '{n} DIAS',
+    pegar: 'PEGAR +{n}',
+    pego: 'PEGO',
+    pecasColecao: 'PEÇAS {n}/{total}',
+    comprar: 'COMPRAR',
+    usando: 'USANDO',
+    usar: 'USAR',
+    liberaCom: 'LIBERA COM A CONQUISTA',
+    faltamMoedas: 'FALTAM {n} MOEDAS',
+    comprou: 'COMPROU!',
+    corProibida: 'ROSA É A COR DO PERIGO: NÃO PODE NO CORPO',
+    conquistaNova: 'CONQUISTA: {nome}',
+    missaoFeita: 'MISSÃO COMPLETA! PEGUE EM MISSÕES',
+    moedasGanhas: '+{n} MOEDAS',
+    recompensa: '+{n}',
+    categorias: { corpo: 'CORPO', padrao: 'PADRÃO', olhos: 'OLHOS', boca: 'BOCA', cabeca: 'CABEÇA', acessorio: 'EXTRA', rastro: 'RASTRO' },
+    pecas: {
+      corpo: { redondo: 'REDONDO', quadrado: 'QUADRADO', gota: 'GOTA', fantasma: 'FANTASMINHA' },
+      padrao: { liso: 'LISO', listras: 'LISTRAS', bolinhas: 'BOLINHAS', xadrez: 'XADREZ' },
+      olhos: { ponto: 'PONTINHOS', grandes: 'GRANDES', sono: 'SONO', bravos: 'BRAVOS' },
+      boca: { nenhuma: 'SEM BOCA', sorriso: 'SORRISO', o: 'OH!', dentes: 'DENTES', lingua: 'LÍNGUA' },
+      cabeca: { nenhuma: 'NADA', topete: 'TOPETE', bone: 'BONÉ', laco: 'LAÇO', coroa: 'COROA', antena: 'ANTENA', chifres: 'CHIFRES' },
+      acessorio: { nenhum: 'NADA', cachecol: 'CACHECOL', oculos: 'ÓCULOS', gravata: 'GRAVATA', estrela: 'ESTRELA' },
+      rastro: { padrao: 'NORMAL', bolhas: 'BOLHAS', faiscas: 'FAÍSCAS', arcoiris: 'ARCO-ÍRIS' },
+    },
+    missoesTxt: { raspoes: 'RASPE {n} VEZES', tentativas: 'FAÇA {n} TENTATIVAS', pct: 'CHEGUE A {n}% EM UMA FASE',
+      vitoria: 'VENÇA UMA FASE', vitorias: 'VENÇA {n} FASES', secreta: 'PEGUE UMA MOEDA SECRETA', minutos: 'JOGUE {n} MINUTOS',
+      combo: 'FAÇA UM COMBO DE RASPÃO ×{n}', pctDificil: 'CHEGUE A {n}% NUMA FASE DIFÍCIL OU MAIS' },
+    conquistas: {
+      primeiraVitoria: { nome: 'PRIMEIRA VITÓRIA', desc: 'VENÇA UMA FASE' },
+      correnteza: { nome: 'CONTRA A CORRENTE', desc: 'VENÇA CORRENTEZA' },
+      prensa: { nome: 'PRENSADO', desc: 'VENÇA PRENSA' },
+      raspoes100: { nome: 'NA TRAVE', desc: 'RASPE 100 VEZES' },
+      raspoes1000: { nome: 'MESTRE DO RASPÃO', desc: 'RASPE 1000 VEZES' },
+      combo5: { nome: 'COMBO!', desc: 'FAÇA UM COMBO DE RASPÃO ×5' },
+      quase: { nome: 'QUASE...', desc: 'MORRA EM 99%' },
+      persistente: { nome: 'TEIMOSO', desc: '50 TENTATIVAS NUMA FASE' },
+      moedaSecreta: { nome: 'ACHADO', desc: 'PEGUE UMA MOEDA SECRETA' },
+      tresMoedas: { nome: 'TESOURO COMPLETO', desc: 'AS 3 MOEDAS SECRETAS DE UMA FASE' },
+      criador: { nome: 'CRIADOR', desc: 'CRIE UMA FASE NO EDITOR' },
+      verificador: { nome: 'APROVADA', desc: 'VERIFIQUE UMA FASE SUA' },
+      estilo: { nome: 'ESTILOSO', desc: 'COMPRE UMA PEÇA' },
+      colecionador: { nome: 'COLECIONADOR', desc: 'COMPRE 8 PEÇAS' },
+      maratona: { nome: 'MARATONA', desc: 'JOGUE 30 MINUTOS' },
+      missoes10: { nome: 'DEDICADO', desc: 'COMPLETE 10 MISSÕES' },
+    },
+
     // ------------------------------------------------------------ editor
     criar: 'CRIAR',
     editor: {
@@ -500,6 +555,9 @@ const Sprites = (() => {
     copia: ['####.', '#..#.', '#.####', '#.#..#', '###..#', '..#..#', '..####'],
     ima: ['##.##', '##.##', '#...#', '#...#', '#...#', '.###.', '.....'],
     compartilhar: ['...#...', '..###..', '.#.#.#.', '...#...', '#..#..#', '#.....#', '#######'],
+    trofeu: ['#######', '#.###.#', '.#####.', '..###..', '...#...', '..###..', '.#####.'],
+    moedinha: ['..###..', '.#www#.', '#ww#ww#', '#w#w#w#', '#ww#ww#', '.#www#.', '..###..'],
+    cabide: ['...#...', '..#.#..', '....#..', '...#...', '.#####.', '#.....#', '#######'],
     interrogacao: ['.###.', '#...#', '....#', '...#.', '..#..', '.....', '..#..'],
     // tipos de evento (paleta e linha do tempo)
     ev_chuva: ['#..#..#', '#..#..#', '.......', '.#..#..', '.#..#..', '.......', '#..#..#'],
@@ -985,6 +1043,8 @@ UI.telas.fases = (() => {
     C.botao({ x: 402, y: CART.y + CART.h / 2 - 20, w: 26, h: 40, icone: Sprites.desenho('setaDir', PAL.branco), acao: () => mudar(1) });
     const pri = C.botao({ x: 180, y: 216, w: 120, h: 22, texto: t('jogar'), escala: 2, primario: true, cor: PAL.alma, acao: jogar });
     C.botao({ x: 330, y: 6, w: 64, h: 16, texto: t('criar'), icone: Sprites.desenho('lapis', PAL.branco), acao: () => { Sound.sfx('confirmar'); Game.irPara('criadas'); } });
+    C.botao({ x: 14, y: 218, w: 80, h: 20, texto: t('visual'), icone: Sprites.desenho('cabide', PAL.branco), acao: () => { Sound.sfx('confirmar'); Game.irPara('visual'); } });
+    C.botao({ x: 386, y: 218, w: 80, h: 20, texto: t('missoes'), icone: Sprites.desenho('trofeu', PAL.ouro), acao: () => { Sound.sfx('confirmar'); Game.irPara('missoes'); } });
     C.focar(pri);
   }
 
@@ -1087,6 +1147,12 @@ UI.telas.fases = (() => {
       C.itens[1].oculto = idx === 0;
       C.itens[2].oculto = idx === n - 1;
       C.desenhar(c, tm);
+      desenharCarteira(c, 324, 10);
+      // bolinha no MISSÕES: tem recompensa esperando
+      const m = Save.dados.missoes;
+      if (m.diarias.concat(m.semanais).some(x => x.prog >= x.alvo && !x.pega) && Math.floor(tm * 3) % 2 === 0) {
+        c.fillStyle = PAL.perigo; c.fillRect(461, 215, 6, 6); c.fillStyle = PAL.branco; c.fillRect(463, 216, 2, 3); c.fillRect(463, 220, 2, 1);
+      }
       if (aviso) UI.texto(c, aviso, 240, 258, { alinhar: 'centro', cor: PAL.almaClara });
     },
   };

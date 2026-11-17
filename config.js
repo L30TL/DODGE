@@ -9,7 +9,7 @@
 // =============================================================================
 
 const CONFIG = {
-  versao: '0.4.0-dev',     // versão do jogo (aparece na tela inicial e no registro de erros)
+  versao: '0.5.0-dev',     // versão do jogo (aparece na tela inicial e no registro de erros)
 
   // ---------------------------------------------------------------- tela -----
   tela: {
@@ -133,6 +133,25 @@ const CONFIG = {
     subpassosMax: 24,       // colisão testada em até tantos pedaços por frame (nada atravessa nada)
     distSubpasso: 2.5,      // px — um sub-passo a cada tanto de movimento (alma ou projétil mais rápido)
     dtSubpasso: 1 / 240,    // s — e pelo menos um a cada tanto de tempo (a morte cai no instante certo)
+  },
+
+  // ----------------------------------------------------------- progressão ----
+  progressao: {
+    avisoS: 2.6,            // s — quanto tempo o aviso de conquista/missão fica no topo
+  },
+
+  // ------------------------------------------------------------ economia -----
+  // Moedas comuns só compram VISUAL (nada dá vantagem; nada custa dinheiro de verdade).
+  // Só contam nas fases oficiais e sem debug.
+  economia: {
+    porPct: 1,              // moedas por % novo de recorde (de 40% pra 55% = 15 moedas)
+    raspao: 1,              // moedas por raspão
+    vitoria: { facil: 40, normal: 60, dificil: 90, dificilimo: 130, insano: 180, demonio: 300 }, // 1ª vitória
+    vitoriaRepetida: 10,    // vencer de novo
+    missoesPorDia: 3,
+    missoesPorSemana: 2,
+    tempoLote: 15,          // s — o tempo jogado entra nas missões de 15 em 15 s
+    pecasIniciais: ['corpo.redondo', 'olhos.ponto', 'boca.nenhuma', 'cabeca.nenhuma', 'acessorio.nenhum', 'padrao.liso', 'rastro.padrao'],
   },
 
   // -------------------------------------------------------------- editor -----
