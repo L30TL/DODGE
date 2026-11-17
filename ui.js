@@ -49,6 +49,18 @@ const TEXTOS = {
     ganhouEstrelas: '+{n}',
     maisFasesEmBreve: 'MAIS FASES EM BREVE!',
     girarCelular: 'GIRE O CELULAR',
+    jogar: 'JOGAR',
+    versao: 'V{n}',
+    rotuloDebug: 'DEBUG',
+    saveIndisponivel: 'SAVE INDISPONÍVEL NESTE NAVEGADOR',
+    saveRecuperado: 'SEU SAVE TINHA UM PROBLEMA E FOI RECUPERADO DO BACKUP',
+    savePerdido: 'O SAVE ESTAVA ESTRAGADO; UMA CÓPIA FOI GUARDADA',
+    audioInterrompido: 'O SOM PAROU. TOQUE EM CONTINUAR',
+    erroAviso: 'ERRO REGISTRADO · VEJA EM CONFIGURAÇÕES',
+    registroErros: 'REGISTRO DE ERROS ({n})',
+    copiar: 'COPIAR',
+    copiado: 'COPIADO!',
+    limpar: 'LIMPAR',
     salvar: 'SALVAR',
     calibracaoTitulo: 'CALIBRAR ÁUDIO',
     calibracaoInstrucao: 'TOQUE OU APERTE ESPAÇO JUNTO COM A BATIDA',
@@ -60,6 +72,174 @@ const TEXTOS = {
     vitoriaTentativas: 'TENTATIVAS',
     vitoriaRaspoes: 'RASPÕES',
     vitoriaMoedas: 'MOEDAS',
+    idioma: 'IDIOMA / LANGUAGE',
+    outroIdioma: 'ENGLISH',
+    // ------------------------------------------------------- progressão
+    alma: 'ALMA',
+    perfil: 'PERFIL',
+    nick: 'NICK',
+    semNick: 'SEM NICK',
+    seuNick: 'SEU NICK (SÓ LETRAS E NÚMEROS)',
+    nickProibido: 'ESSE NICK NÃO PODE. ESCOLHA OUTRO',
+    efeitoNick: 'EFEITO DO NICK',
+    emblema: 'EMBLEMA',
+    moldura: 'MOLDURA',
+    nenhum: 'NENHUM',
+    nenhuma: 'NENHUMA',
+    efeitosNick: { nenhum: 'NENHUM', cor: 'COR', degrade: 'DEGRADÊ', onda: 'ONDA', brilho: 'BRILHO', arcoiris: 'ARCO-ÍRIS', faiscas: 'FAÍSCAS' },
+    molduras: { bronze: 'BRONZE', prata: 'PRATA', ouro: 'OURO', arcoiris: 'ARCO-ÍRIS', fogo: 'FOGO' },
+    moldurasComo: { bronze: 'VENÇA 1 FASE', prata: 'VENÇA 3 FASES', ouro: 'AS 3 MOEDAS DE UMA FASE', arcoiris: '10 MISSÕES', fogo: 'VENÇA UM DEMÔNIO' },
+    treino: 'TREINO',
+    infinito: 'INFINITO',
+    volta: 'VOLTA {n}',
+    melhorTempo: 'MELHOR {t}',
+    treinoDica: 'TREINO · C (OU A BANDEIRA): CHECKPOINT · V: TIRAR',
+    checkpoint: 'CHECKPOINT!',
+    checkpointTirado: 'CHECKPOINT TIRADO',
+    precisaEstrelas: 'PRECISA DE {n}★ (VOCÊ TEM {m})',
+    visual: 'VISUAL',
+    missoes: 'MISSÕES',
+    conquistasTitulo: 'CONQUISTAS {n}/{total}',
+    hoje: 'HOJE',
+    estaSemana: 'ESTA SEMANA',
+    trocaEm: 'TROCA EM {t}',
+    horasMin: '{h}H {m}MIN',
+    dias: '{n} DIAS',
+    pegar: 'PEGAR +{n}',
+    pego: 'PEGO',
+    pecasColecao: 'PEÇAS {n}/{total}',
+    comprar: 'COMPRAR',
+    usando: 'USANDO',
+    usar: 'USAR',
+    liberaCom: 'LIBERA COM A CONQUISTA',
+    faltamMoedas: 'FALTAM {n} MOEDAS',
+    comprou: 'COMPROU!',
+    corProibida: 'ROSA É A COR DO PERIGO: NÃO PODE NO CORPO',
+    conquistaNova: 'CONQUISTA: {nome}',
+    missaoFeita: 'MISSÃO COMPLETA! PEGUE EM MISSÕES',
+    moedasGanhas: '+{n} MOEDAS',
+    recompensa: '+{n}',
+    categorias: { corpo: 'CORPO', padrao: 'PADRÃO', olhos: 'OLHOS', boca: 'BOCA', cabeca: 'CABEÇA', acessorio: 'EXTRA', rastro: 'RASTRO' },
+    pecas: {
+      corpo: { redondo: 'REDONDO', quadrado: 'QUADRADO', gota: 'GOTA', fantasma: 'FANTASMINHA' },
+      padrao: { liso: 'LISO', listras: 'LISTRAS', bolinhas: 'BOLINHAS', xadrez: 'XADREZ' },
+      olhos: { ponto: 'PONTINHOS', grandes: 'GRANDES', sono: 'SONO', bravos: 'BRAVOS' },
+      boca: { nenhuma: 'SEM BOCA', sorriso: 'SORRISO', o: 'OH!', dentes: 'DENTES', lingua: 'LÍNGUA' },
+      cabeca: { nenhuma: 'NADA', topete: 'TOPETE', bone: 'BONÉ', laco: 'LAÇO', coroa: 'COROA', antena: 'ANTENA', chifres: 'CHIFRES' },
+      acessorio: { nenhum: 'NADA', cachecol: 'CACHECOL', oculos: 'ÓCULOS', gravata: 'GRAVATA', estrela: 'ESTRELA' },
+      rastro: { padrao: 'NORMAL', bolhas: 'BOLHAS', faiscas: 'FAÍSCAS', arcoiris: 'ARCO-ÍRIS' },
+    },
+    missoesTxt: { raspoes: 'RASPE {n} VEZES', tentativas: 'FAÇA {n} TENTATIVAS', pct: 'CHEGUE A {n}% EM UMA FASE',
+      vitoria: 'VENÇA UMA FASE', vitorias: 'VENÇA {n} FASES', secreta: 'PEGUE UMA MOEDA SECRETA', minutos: 'JOGUE {n} MINUTOS',
+      combo: 'FAÇA UM COMBO DE RASPÃO ×{n}', pctDificil: 'CHEGUE A {n}% NUMA FASE DIFÍCIL OU MAIS' },
+    conquistas: {
+      primeiraVitoria: { nome: 'PRIMEIRA VITÓRIA', desc: 'VENÇA UMA FASE' },
+      correnteza: { nome: 'CONTRA A CORRENTE', desc: 'VENÇA CORRENTEZA' },
+      prensa: { nome: 'PRENSADO', desc: 'VENÇA PRENSA' },
+      raspoes100: { nome: 'NA TRAVE', desc: 'RASPE 100 VEZES' },
+      raspoes1000: { nome: 'MESTRE DO RASPÃO', desc: 'RASPE 1000 VEZES' },
+      combo5: { nome: 'COMBO!', desc: 'FAÇA UM COMBO DE RASPÃO ×5' },
+      quase: { nome: 'QUASE...', desc: 'MORRA EM 99%' },
+      persistente: { nome: 'TEIMOSO', desc: '50 TENTATIVAS NUMA FASE' },
+      moedaSecreta: { nome: 'ACHADO', desc: 'PEGUE UMA MOEDA SECRETA' },
+      tresMoedas: { nome: 'TESOURO COMPLETO', desc: 'AS 3 MOEDAS SECRETAS DE UMA FASE' },
+      criador: { nome: 'CRIADOR', desc: 'CRIE UMA FASE NO EDITOR' },
+      verificador: { nome: 'APROVADA', desc: 'VERIFIQUE UMA FASE SUA' },
+      estilo: { nome: 'ESTILOSO', desc: 'COMPRE UMA PEÇA' },
+      colecionador: { nome: 'COLECIONADOR', desc: 'COMPRE 8 PEÇAS' },
+      maratona: { nome: 'MARATONA', desc: 'JOGUE 30 MINUTOS' },
+      missoes10: { nome: 'DEDICADO', desc: 'COMPLETE 10 MISSÕES' },
+    },
+
+    // ------------------------------------------------------------ editor
+    criar: 'CRIAR',
+    editor: {
+      minhasFases: 'MINHAS FASES',
+      nova: 'NOVA FASE',
+      nomePadrao: 'MINHA FASE {n}',
+      nenhuma: 'NENHUMA FASE AINDA. TOQUE EM NOVA FASE!',
+      editar: 'EDITAR',
+      duplicar: 'DUPLICAR',
+      copiaDe: '{nome} (CÓPIA)',
+      apagar: 'APAGAR',
+      apagada: 'FASE APAGADA',
+      desfazerApagar: 'TRAZER DE VOLTA',
+      eventos: '{n} EVENTOS',
+      editadaHa: 'EDITADA {quando}',
+      agora: 'AGORA',
+      minutos: 'HÁ {n} MIN',
+      horas: 'HÁ {n} H',
+      dias: 'HÁ {n} DIAS',
+      nome: 'NOME',
+      nomeDaFase: 'NOME DA FASE',
+      ok: 'OK',
+      cancelar: 'CANCELAR',
+      musica: 'MÚSICA',
+      dificuldade: 'DIFICULDADE',
+      propriedades: 'PROPRIEDADES',
+      fechar: 'FECHAR',
+      apagarFase: 'APAGAR FASE',
+      confirmar: 'CONFIRMAR?',
+      testar: 'TESTAR',
+      adicionarEm: 'ADICIONAR NA BATIDA {n}',
+      batida: 'BATIDA',
+      batidaDe: 'BATIDA {n} / {total}',
+      fim: 'FIM',
+      depoisDoFim: 'DEPOIS DO FIM DA MÚSICA',
+      toquePosicao: 'TOQUE NA CAIXA PRA POSICIONAR',
+      limite: 'LIMITE DE EVENTOS DA FASE',
+      salvo: 'SALVO',
+      salvando: 'SALVANDO...',
+      semArmazenamento: 'NÃO DÁ PRA SALVAR NESTE NAVEGADOR',
+      desfeito: 'DESFEITO',
+      refeito: 'REFEITO',
+      copiado: 'EVENTO COPIADO',
+      colado: 'EVENTO COLADO',
+      testeTitulo: 'TESTE',
+      editorVoltar: 'EDITOR',
+      venceuTeste: 'VOCÊ VENCEU SUA FASE!',
+      importar: 'IMPORTAR',
+      colarCodigo: 'COLE O CÓDIGO DA FASE',
+      codigoDaFase: 'CÓDIGO DA FASE: COPIE E MANDE PRA QUEM QUISER',
+      copiarCodigo: 'COPIAR',
+      codigoCopiado: 'CÓDIGO COPIADO!',
+      compartilhar: 'COMPARTILHAR',
+      importada: 'FASE IMPORTADA!',
+      nomeImportado: 'FASE IMPORTADA',
+      nomeProibido: 'ESSE NOME NÃO PODE. ESCOLHA OUTRO',
+      deCodigo: 'CÓDIGO',
+      verificada: 'VERIFICADA',
+      naoVerificada: 'NÃO VERIFICADA',
+      vencaDoComeco: 'VENÇA DO COMEÇO PRA VERIFICAR',
+      precisaVerificar: 'ABRA NO EDITOR E VENÇA DO COMEÇO PRA COMPARTILHAR',
+      conferindo: 'CONFERINDO SE A FASE É POSSÍVEL... {n}%',
+      verificadaOk: 'FASE VERIFICADA! JÁ DÁ PRA COMPARTILHAR',
+      impossivelTeclado: 'NO TECLADO NÃO DÁ PRA PASSAR PERTO DA BATIDA {n}',
+      gerandoCodigo: 'GERANDO O CÓDIGO...',
+      errosCodigo: { formato: 'ISSO NÃO É UM CÓDIGO DE FASE', incompleto: 'CÓDIGO INCOMPLETO (COPIOU TUDO?)',
+        versao: 'CÓDIGO DE UMA VERSÃO MAIS NOVA DO JOGO', grande: 'CÓDIGO GRANDE DEMAIS',
+        invalido: 'CÓDIGO ESTRAGADO', navegador: 'ESTE NAVEGADOR NÃO ABRE ESSE CÓDIGO' },
+      ima: 'ÍMÃ: {modo}',
+      imas: { q: '1/4', m: '1/2', b: 'BATIDA', bumbo: 'BUMBO', caixa: 'CAIXA', melodia: 'MELODIA', livre: 'LIVRE' },
+      musicas: { despertar: 'DESPERTAR', correnteza: 'CORRENTEZA', prensa: 'PRENSA' },
+      secoes: { intro: 'INTRO', verso: 'VERSO', verso2: 'VERSO', pre: 'PRÉ', refrao: 'REFRÃO', ponte: 'PONTE',
+        final: 'FINAL', fim: 'FIM', quebra: 'QUEBRA', sobe: 'SUBIDA', menu: 'MENU' },
+      tipos: { chuva: 'CHUVA', fogo: 'FOGO CRUZADO', laser: 'LASER', paredes: 'PAREDES', espiral: 'ESPIRAL',
+        teleguiada: 'TELEGUIADA', anel: 'ANEL', moeda: 'MOEDA', caixa: 'TAMANHO', girar: 'GIRAR', escuro: 'ESCURO',
+        inverter: 'INVERTER', espelho: 'ESPELHO' },
+      curtos: { chuva: 'CHUVA', fogo: 'FOGO', laser: 'LASER', paredes: 'PAREDE', espiral: 'ESPIRAL',
+        teleguiada: 'MIRA', anel: 'ANEL', moeda: 'MOEDA', caixa: 'TAMANHO', girar: 'GIRAR', escuro: 'ESCURO',
+        inverter: 'INVERTE', espelho: 'ESPELHO' },
+      campos: { pos: 'POSIÇÕES', de: 'VEM DE', vel: 'VELOCIDADE', tam: 'TAMANHO', intervalo: 'INTERVALO (BAT)',
+        aviso: 'AVISO (BAT)', eixo: 'EIXO', alternar: 'ALTERNAR LADOS', orient: 'DIREÇÃO', larg: 'LARGURA',
+        dur: 'DURAÇÃO (BAT)', ate: 'VARRE ATÉ', modo: 'MODO', centro: 'CENTRO', espaco: 'ESPAÇO', fechar: 'FECHAR (BAT)',
+        segurar: 'SEGURAR (BAT)', abrir: 'ABRIR (BAT)', x: 'X', y: 'Y', bracos: 'BRAÇOS', giro: 'GIRO', ang: 'ÂNGULO',
+        cadencia: 'TIROS/BATIDA', quantidade: 'QUANTIDADE', guia: 'CURVA', guiaDur: 'CURVA DURA (BAT)', raio: 'RAIO',
+        id: 'QUAL MOEDA', largura: 'LARGURA', altura: 'ALTURA', angulo: 'ÂNGULO', nivel: 'ESCURIDÃO', ativo: 'LIGADO',
+        invX: 'INVERTE ←→', invY: 'INVERTE ↑↓', raioLuz: 'LUZ (RAIO)' },
+      opcoes: { cima: 'CIMA', baixo: 'BAIXO', esquerda: 'ESQUERDA', direita: 'DIREITA', h: 'HORIZONTAL', v: 'VERTICAL',
+        fechar: 'FECHAR', buraco: 'BURACO', x: '←→', y: '↑↓', xy: 'OS DOIS', sim: 'SIM', nao: 'NÃO', nada: '-' },
+    },
     dificuldades: {
       facil: 'FÁCIL',
       normal: 'NORMAL',
@@ -71,9 +251,26 @@ const TEXTOS = {
   },
 };
 
+// Idioma: o escolhido nas configurações; senão o do navegador (português → pt, o resto → en).
+const Idioma = {
+  atual: CONFIG.idioma,
+  escolher(salvo) {
+    let id = salvo;
+    if (id !== 'pt' && id !== 'en') {
+      const nav = (typeof navigator !== 'undefined' && navigator.language) || '';
+      id = !nav || /^pt/i.test(nav) ? 'pt' : 'en';
+    }
+    if (!TEXTOS[id]) id = 'pt';
+    Idioma.atual = id;
+    if (typeof document !== 'undefined' && document.documentElement) document.documentElement.lang = id === 'pt' ? 'pt-BR' : 'en';
+    return id;
+  },
+};
+
 function t(chave, valores) {
-  const tabela = TEXTOS[CONFIG.idioma] || TEXTOS.pt;
-  let s = chave.split('.').reduce((o, k) => (o ? o[k] : undefined), tabela);
+  const busca = (tab) => chave.split('.').reduce((o, k) => (o ? o[k] : undefined), tab);
+  let s = busca(TEXTOS[Idioma.atual] || TEXTOS.pt);
+  if (typeof s !== 'string') s = busca(TEXTOS.pt);       // faltou no idioma: usa o português
   if (s === undefined) s = chave;
   if (valores) for (const k in valores) s = s.split('{' + k + '}').join(String(valores[k]));
   return s;
@@ -179,6 +376,8 @@ const Fonte = (() => {
     '·': ['.', '.', '.', '#', '.', '.', '.'],
     '→': ['.......', '....#..', '.....#.', '#######', '.....#.', '....#..', '.......'],
     '←': ['.......', '..#....', '.#.....', '#######', '.#.....', '..#....', '.......'],
+    '↑': ['..#..', '.###.', '#.#.#', '..#..', '..#..', '..#..', '..#..'],
+    '↓': ['..#..', '..#..', '..#..', '..#..', '#.#.#', '.###.', '..#..'],
     '★': ['...#...', '..###..', '#######', '.#####.', '..###..', '.##.##.', '.#...#.'],
     '_': ['.....', '.....', '.....', '.....', '.....', '.....', '#####'],
     ' ': ['...', '...', '...', '...', '...', '...', '...'],
@@ -246,6 +445,8 @@ const Fonte = (() => {
   }
 
   function glifo(ch) { return mapa[ch] || mapa['?']; }
+  // a fonte tem esse caractere? (nomes digitados pelo jogador)
+  function suporta(ch) { if (!atlas) construir(); return !!mapa[String(ch).toUpperCase()]; }
 
   function largura(str, escala = 1) {
     str = String(str).toUpperCase();
@@ -280,7 +481,7 @@ const Fonte = (() => {
     }
   }
 
-  return { desenhar, largura, ALTURA: 7 };
+  return { desenhar, largura, suporta, ALTURA: 7 };
 })();
 
 // =============================================================================
@@ -384,6 +585,36 @@ const Sprites = (() => {
     setaEsq: ['....#', '...##', '..###', '.####', '..###', '...##', '....#'],
     cadeado: ['.###.', '#...#', '#...#', '#####', '##.##', '##.##', '#####'],
     check: ['......#', '.....##', '#...##.', '##.##..', '.###...', '..#....', '.......'],
+    // editor
+    lapis: ['.....##', '....#.#', '...#.#.', '..#.#..', '.#.#...', '###....', '##.....'],
+    desfazer: ['..#....', '.##....', '#######', '.##...#', '..#...#', '......#', '..####.'],
+    refazer: ['....#..', '....##.', '#######', '#...##.', '#...#..', '#......', '.####..'],
+    tocar: ['#....', '##...', '###..', '####.', '###..', '##...', '#....'],
+    mais: ['.....', '..#..', '..#..', '#####', '..#..', '..#..', '.....'],
+    menos: ['.....', '.....', '.....', '#####', '.....', '.....', '.....'],
+    lixo: ['.###.', '#####', '.....', '#.#.#', '#.#.#', '#.#.#', '.###.'],
+    copia: ['####.', '#..#.', '#.####', '#.#..#', '###..#', '..#..#', '..####'],
+    ima: ['##.##', '##.##', '#...#', '#...#', '#...#', '.###.', '.....'],
+    compartilhar: ['...#...', '..###..', '.#.#.#.', '...#...', '#..#..#', '#.....#', '#######'],
+    trofeu: ['#######', '#.###.#', '.#####.', '..###..', '...#...', '..###..', '.#####.'],
+    bandeira: ['#######', '#.....#', '#######', '#......', '#......', '#......', '#......'],
+    moedinha: ['..###..', '.#www#.', '#ww#ww#', '#w#w#w#', '#ww#ww#', '.#www#.', '..###..'],
+    cabide: ['...#...', '..#.#..', '....#..', '...#...', '.#####.', '#.....#', '#######'],
+    interrogacao: ['.###.', '#...#', '....#', '...#.', '..#..', '.....', '..#..'],
+    // tipos de evento (paleta e linha do tempo)
+    ev_chuva: ['#..#..#', '#..#..#', '.......', '.#..#..', '.#..#..', '.......', '#..#..#'],
+    ev_fogo: ['##.....', '.......', '....##.', '.......', '##.....', '.......', '....##.'],
+    ev_laser: ['..###..', '..###..', '..###..', '..###..', '..###..', '..###..', '..###..'],
+    ev_paredes: ['##...##', '##...##', '##...##', '##...##', '##...##', '##...##', '##...##'],
+    ev_espiral: ['..#....', '.....#.', '.#.....', '...#...', '.....#.', '.#.....', '....#..'],
+    ev_teleguiada: ['...#...', '..###..', '.#.#.#.', '...#...', '...#...', '.......', '...#...'],
+    ev_anel: ['..#.#..', '.......', '#.....#', '...#...', '#.....#', '.......', '..#.#..'],
+    ev_moeda: ['..###..', '.#...#.', '#..#..#', '#.###.#', '#..#..#', '.#...#.', '..###..'],
+    ev_caixa: ['##...##', '#.....#', '.......', '...#...', '.......', '#.....#', '##...##'],
+    ev_girar: ['..###..', '.#...#.', '#.....#', '#.....#', '#...###', '.#...#.', '.....#.'],
+    ev_escuro: ['..###..', '.##....', '##.....', '##.....', '##.....', '.##....', '..###..'],
+    ev_inverter: ['..#....', '.#.....', '#######', '.......', '#######', '.....#.', '....#..'],
+    ev_espelho: ['##...##', '##...##', '...#...', '...#...', '...#...', '##...##', '##...##'],
     // dedo arrastando (dica de toque)
     dedo: [
       '....##......',
@@ -491,6 +722,80 @@ const UI = {
     ctx.drawImage(img, Math.round(x), Math.round(y), w, h);
   },
 };
+
+// ------------------------------------------------------------ EntradaTexto --
+// Caixa de texto de verdade (HTML) por cima do jogo: no celular abre o teclado.
+// Só aceita caracteres que a fonte do jogo sabe desenhar.
+const EntradaTexto = (() => {
+  let caixa = null, campo = null, titulo = null, ok = null, cancelar = null, atual = null;
+  function limpar(txt, max, cru) {
+    if (cru) return String(txt).replace(/\s+/g, '').slice(0, max);
+    let out = '';
+    for (const ch of String(txt).toUpperCase()) if (Fonte.suporta(ch)) out += ch;
+    return out.replace(/\s+/g, ' ').slice(0, max);
+  }
+  function fechar(confirmou) {
+    if (!atual) return;
+    const a = atual; atual = null;
+    caixa.style.display = 'none';
+    campo.blur();
+    if (confirmou) a.aoConfirmar && a.aoConfirmar(limpar(campo.value, a.max, a.cru).trim());
+    else a.aoCancelar && a.aoCancelar();
+  }
+  function criar() {
+    caixa = document.createElement('div');
+    caixa.className = 'entrada-texto';
+    caixa.innerHTML = '<div class="et-painel"><div class="et-titulo"></div>' +
+      '<input class="et-campo" type="text" autocomplete="off" autocapitalize="characters" spellcheck="false" enterkeyhint="done">' +
+      '<div class="et-botoes"><button class="et-cancelar"></button><button class="et-ok"></button></div></div>';
+    document.body.appendChild(caixa);
+    titulo = caixa.querySelector('.et-titulo');
+    campo = caixa.querySelector('.et-campo');
+    ok = caixa.querySelector('.et-ok');
+    cancelar = caixa.querySelector('.et-cancelar');
+    ok.addEventListener('click', () => fechar(true));
+    cancelar.addEventListener('click', () => fechar(false));
+    caixa.addEventListener('pointerdown', (e) => { if (e.target === caixa) fechar(false); });
+    campo.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') { e.preventDefault(); fechar(true); }
+      else if (e.key === 'Escape') { e.preventDefault(); fechar(false); }
+    });
+    campo.addEventListener('input', () => {
+      if (!atual || atual.cru) return;
+      const l = limpar(campo.value, atual.max);
+      if (l !== campo.value) campo.value = l;
+    });
+    campo.addEventListener('focus', () => { if (atual && atual.somenteLeitura) campo.select(); });
+  }
+  return {
+    // op = { titulo, valor, max, aoConfirmar(texto), aoCancelar(),
+    //        cru (código: sem maiúsculas nem filtro de letras), somenteLeitura, textoOk, textoCancelar }
+    pedir(op) {
+      if (!caixa) criar();
+      atual = Object.assign({ max: CONFIG.limites.maxTexto }, op);
+      titulo.textContent = op.titulo || '';
+      ok.textContent = op.textoOk || t('editor.ok');
+      cancelar.textContent = op.textoCancelar || t('editor.cancelar');
+      campo.maxLength = atual.max;
+      campo.readOnly = !!op.somenteLeitura;
+      campo.style.textTransform = op.cru ? 'none' : 'uppercase';
+      campo.style.fontSize = op.cru ? '13px' : '18px';
+      campo.value = limpar(op.valor || '', atual.max, op.cru);
+      caixa.style.display = 'flex';
+      setTimeout(() => { campo.focus(); campo.select(); }, 30);
+    },
+    aberta() { return !!atual; },
+    fechar() { fechar(false); },
+    // copia o texto da caixa (botão COPIAR do código); devolve uma promessa de true/false
+    copiar() {
+      const txt = campo ? campo.value : '';
+      const reserva = () => { try { campo.select(); return document.execCommand('copy'); } catch (e) { return false; } };
+      if (navigator.clipboard && navigator.clipboard.writeText) return navigator.clipboard.writeText(txt).then(() => true, reserva);
+      return Promise.resolve(reserva());
+    },
+    limpar,
+  };
+})();
 
 // ---------------------------------------------------------------- Controles --
 // Um conjunto de controles de uma tela: cuida de foco (teclado), toque e mouse.
@@ -745,7 +1050,7 @@ UI.telas.titulo = (() => {
         const txt = Input.temToque() ? t('toquePraComecar') : t('cliquePraComecar');
         UI.texto(c, txt, 240, 196, { escala: 2, alinhar: 'centro', cor: PAL.branco, sombra: PAL.preto });
       }
-      UI.texto(c, 'V0.1', 474, 260, { alinhar: 'direita', cor: PAL.cinza });
+      UI.texto(c, t('versao', { n: CONFIG.versao.toUpperCase() }), 474, 260, { alinhar: 'direita', cor: PAL.cinza });
     },
   };
 })();
@@ -767,10 +1072,12 @@ UI.telas.fases = (() => {
     Sound.sfx('menu');
   }
 
-  function jogar() {
+  const travada = (f) => Progresso.demonTravado(f, Save.estrelas(Levels.FASES));
+  function jogar(treino) {
     const f = lista()[idx];
+    if (travada(f) && !Debug.ativo) { Sound.sfx('voltar'); return; }
     Sound.sfx('confirmar');
-    Game.jogar(f);
+    if (treino === true) Game.treinar(f); else Game.jogar(f);
   }
 
   function montar() {
@@ -778,7 +1085,12 @@ UI.telas.fases = (() => {
     C.botao({ x: 456, y: 6, w: 18, h: 16, icone: Sprites.desenho('engrenagem', PAL.branco), acao: () => Game.irPara('config', { voltar: 'fases' }) });
     C.botao({ x: 52, y: CART.y + CART.h / 2 - 20, w: 26, h: 40, icone: Sprites.desenho('setaEsq', PAL.branco), acao: () => mudar(-1) });
     C.botao({ x: 402, y: CART.y + CART.h / 2 - 20, w: 26, h: 40, icone: Sprites.desenho('setaDir', PAL.branco), acao: () => mudar(1) });
-    const pri = C.botao({ x: 180, y: 216, w: 120, h: 22, texto: 'JOGAR', escala: 2, primario: true, cor: PAL.alma, acao: jogar });
+    const pri = C.botao({ x: 180, y: 216, w: 120, h: 22, texto: t('jogar'), escala: 2, primario: true, cor: PAL.alma, acao: jogar });
+    C.botao({ x: 330, y: 6, w: 64, h: 16, texto: t('criar'), icone: Sprites.desenho('lapis', PAL.branco), acao: () => { Sound.sfx('confirmar'); Game.irPara('criadas'); } });
+    C.botao({ x: 100, y: 6, w: 76, h: 16, texto: t('infinito'), cor: PAL.ouro, acao: () => { Sound.sfx('confirmar'); Game.infinito(); } });
+    C.botao({ x: 306, y: 218, w: 66, h: 20, texto: t('treino'), icone: Sprites.desenho('bandeira', PAL.verde), acao: () => jogar(true) });
+    C.botao({ x: 14, y: 218, w: 80, h: 20, texto: t('visual'), icone: Sprites.desenho('cabide', PAL.branco), acao: () => { Sound.sfx('confirmar'); Game.irPara('visual'); } });
+    C.botao({ x: 386, y: 218, w: 80, h: 20, texto: t('missoes'), icone: Sprites.desenho('trofeu', PAL.ouro), acao: () => { Sound.sfx('confirmar'); Game.irPara('missoes'); } });
     C.focar(pri);
   }
 
@@ -810,7 +1122,12 @@ UI.telas.fases = (() => {
     // moedas secretas
     for (let i = 0; i < 3; i++) UI.sprite(c, Sprites.moeda(reg.moedas[i]), bx + i * 18, y + 122, 2);
     UI.texto(c, t('tentativas', { n: reg.tentativas }), x + CART.w - 16, y + 126, { alinhar: 'direita', cor: PAL.cinzaClaro });
-    if (f.debug) UI.texto(c, 'DEBUG', x + CART.w - 16, y + 146, { alinhar: 'direita', cor: PAL.perigo });
+    if (f.debug) UI.texto(c, t('rotuloDebug'), x + CART.w - 16, y + 146, { alinhar: 'direita', cor: PAL.perigo });
+    if (Progresso.demonTravado(f, Save.estrelas(Levels.FASES))) {
+      c.globalAlpha = alpha * 0.8; c.fillStyle = PAL.preto; c.fillRect(x + 1, y + 1, CART.w - 2, CART.h - 2); c.globalAlpha = alpha;
+      UI.sprite(c, Sprites.desenho('cadeado', PAL.branco), x + CART.w / 2 - 10, y + 50, 4);
+      UI.texto(c, t('precisaEstrelas', { n: CONFIG.progressao.estrelasDemon, m: Save.estrelas(Levels.FASES) }), x + CART.w / 2, y + 100, { alinhar: 'centro', cor: PAL.ouro });
+    }
     c.globalAlpha = 1;
   }
 
@@ -862,6 +1179,7 @@ UI.telas.fases = (() => {
     desenhar(c) {
       const tm = Game.tempo;
       const L = lista();
+      if (idx >= L.length) idx = L.length - 1;            // o F3 fechou e o Laboratório saiu da lista
       const f = L[idx];
       const cor = COR_DIFICULDADE[f.dificuldade];
       Game.desenharFundo(c, tm * 92 / 60, 0.25, cor, false);
@@ -881,6 +1199,12 @@ UI.telas.fases = (() => {
       C.itens[1].oculto = idx === 0;
       C.itens[2].oculto = idx === n - 1;
       C.desenhar(c, tm);
+      desenharCarteira(c, 324, 10);
+      // bolinha no MISSÕES: tem recompensa esperando
+      const m = Save.dados.missoes;
+      if (m.diarias.concat(m.semanais).some(x => x.prog >= x.alvo && !x.pega) && Math.floor(tm * 3) % 2 === 0) {
+        c.fillStyle = PAL.perigo; c.fillRect(461, 215, 6, 6); c.fillStyle = PAL.branco; c.fillRect(463, 216, 2, 3); c.fillRect(463, 220, 2, 1);
+      }
       if (aviso) UI.texto(c, aviso, 240, 258, { alinhar: 'centro', cor: PAL.almaClara });
     },
   };
@@ -890,7 +1214,21 @@ UI.telas.fases = (() => {
 UI.telas.config = (() => {
   const C = new Controles();
   let voltarPara = 'fases';
-  let confirmando = false, msg = null, msgT = 0;
+  let confirmando = false, msg = null, msgT = 0, copiadoT = -9;
+
+  // Copia o registro de erros (pra colar numa mensagem). Funciona mesmo sem a API nova.
+  function copiarErros() {
+    const txt = Erros.texto();
+    const fallback = () => {
+      try {
+        const ta = document.createElement('textarea');
+        ta.value = txt; ta.style.position = 'fixed'; ta.style.opacity = '0';
+        document.body.appendChild(ta); ta.select(); document.execCommand('copy'); ta.remove();
+      } catch (e) { /* ok */ }
+    };
+    try { navigator.clipboard.writeText(txt).catch(fallback); } catch (e) { fallback(); }
+    copiadoT = Game.tempo;
+  }
   const cfg = () => Save.config;
   const salvar = () => { Sound.volumes(); Save.gravarDepois(); };
 
@@ -936,6 +1274,17 @@ UI.telas.config = (() => {
         Sound.volumes();
         msg = t('progressoApagado'); msgT = Game.tempo;
       } });
+    y += 22;
+    C.botao({ x: x + rot, y: y - 2, w: 60, h: 14, texto: () => (copiadoT > Game.tempo - 1.5 ? t('copiado') : t('copiar')), acao: copiarErros });
+    C.botao({ x: x + rot + 66, y: y - 2, w: 50, h: 14, texto: t('limpar'), acao: () => Erros.limpar() });
+    C.botao({ x: 372, y: 8, w: 100, h: 14, texto: t('outroIdioma'), cor: PAL.ouro, acao: () => {
+      Save.config.idioma = Idioma.atual === 'pt' ? 'en' : 'pt';
+      Idioma.escolher(Save.config.idioma);
+      Save.gravar();
+      const girar = document.getElementById('girar');
+      if (girar) girar.lastChild.textContent = t('girarCelular');
+      montar();
+    } });
     const voltar = C.botao({ x: 180, y: 238, w: 120, h: 18, texto: '← ' + t('voltar'), primario: true, cor: PAL.alma, acao: sair });
     C.focar(voltar);
     C.focar(C.itens[0]);
@@ -973,10 +1322,11 @@ UI.telas.config = (() => {
       y += 26;
       UI.texto(c, t('reduzirEfeitos'), x, y + 1, { cor: PAL.branco }); y += 22;
       UI.texto(c, t('pausaAuto'), x, y + 1, { cor: PAL.branco }); y += 22;
-      UI.texto(c, t('apagarProgresso'), x, y + 1, { cor: PAL.perigoClaro });
+      UI.texto(c, t('apagarProgresso'), x, y + 1, { cor: PAL.perigoClaro }); y += 22;
+      UI.texto(c, t('registroErros', { n: Erros.lista.length }), x, y + 1, { cor: Erros.lista.length ? PAL.ouro : PAL.cinzaClaro });
       C.desenhar(c, tm);
-      if (msg && tm - msgT < 2) UI.texto(c, msg, 240, 222, { alinhar: 'centro', cor: PAL.ouro });
-      if (!Save.disponivel) UI.texto(c, 'SAVE INDISPONÍVEL NESTE NAVEGADOR', 240, 260, { alinhar: 'centro', cor: PAL.perigo });
+      if (msg && tm - msgT < 2) UI.texto(c, msg, 240, 226, { alinhar: 'centro', cor: PAL.ouro });
+      if (!Save.disponivel) UI.texto(c, t('saveIndisponivel'), 240, 260, { alinhar: 'centro', cor: PAL.perigo });
     },
   };
 })();
@@ -1012,7 +1362,7 @@ UI.telas.calibrar = (() => {
     toques.push(off);
     if (toques.length >= CONFIG.audio.calibracaoToques + 2) {
       const validos = toques.slice(2);                // os 2 primeiros são aquecimento
-      resultado = Math.round(mediana(validos) * 1000 - CONFIG.audio.calibracaoCompensacaoMs);
+      resultado = Math.max(-100, Math.min(600, Math.round(mediana(validos) * 1000 - CONFIG.audio.calibracaoCompensacaoMs)));
       montar();
     }
   }

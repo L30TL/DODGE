@@ -10,7 +10,7 @@
 // =============================================================================
 
 const Debug = (() => {
-  const ativo = typeof location !== 'undefined' && /[?&]debug=1/.test(location.search);
+  const ativo = typeof location !== 'undefined' && /[?&]debug=1/.test(location.search);   // ?debug=1, ou F3 a qualquer hora
   let painel = null, el = {};
   let fpsAcum = 0, fpsN = 0, fpsMax = 0, ultimoPainel = 0;
   let ultimoErro = null;
@@ -24,8 +24,18 @@ const Debug = (() => {
     bot: false,
 
     init() {
+      // F3 abre/fecha o painel de debug em qualquer tela (usar o debug não conta recorde nem vitória)
+      window.addEventListener('keydown', (ev) => { if (ev.code === 'F3') { ev.preventDefault(); D.alternar(); } });
       if (!ativo) return;
       criarPainel();
+    },
+
+    alternar() {
+      if (!painel) { criarPainel(); D.ativo = true; return; }
+      const aberto = painel.style.display !== 'none';
+      painel.style.display = aberto ? 'none' : '';
+      D.ativo = !aberto;
+      if (aberto) { D.invencivel = false; D.bot = false; D.caminho = null; D.hitbox = false; if (D.vel !== 1) { D.vel = 1; Sound.velocidade(1); } }
     },
 
     frame(dt, ms) {
@@ -39,7 +49,9 @@ const Debug = (() => {
       ];
       if (Game.nomeTela === 'jogo' && J.fase) {
         linhas.push(`t ${J.t.toFixed(2)}s · batida ${J.batida.toFixed(1)} · ${(J.prog * 100).toFixed(1)}%`);
-        linhas.push(`projéteis ${J.ataques.n}/${CONFIG.ataques.poolTamanho} (estouros ${J.ataques.estourou}) · partículas ${Game.Particulas.ativas()}`);
+        linhas.push(`projéteis ${J.ataques.n}/${J.ataques.pool.length} (estouros ${J.ataques.estourou}) · partículas ${Game.Particulas.ativas()}`);
+        if (J.estado === 'jogando' && Sound.tocando()) linhas.push(`áudio × jogo: ${((Sound.posicao() - J.t) * 1000).toFixed(1)} ms`);
+        if (D.caminho) linhas.push('assistindo o solver (S desliga)');
       }
       linhas.push(`áudio: atrasadas ${Sound.stats.atrasadas} · sfx ${Sound.stats.sfxAtivos} · latência ${(Sound.latencia() * 1000).toFixed(0)} ms`);
       if (ultimoErro) linhas.push('ERRO: ' + ultimoErro);
@@ -59,6 +71,14 @@ const Debug = (() => {
       if (c === 'KeyI') { D.invencivel = !D.invencivel; marcarTrapaca(); return true; }
       if (c === 'KeyL') { trocarVel(); return true; }
       if (c === 'KeyB') { D.bot = !D.bot; marcarTrapaca(); return true; }
+      if (c === 'KeyS' && Game.nomeTela === 'jogo') {
+        // assistir o solver: segue o caminho provado desde o começo da fase
+        if (D.caminho) { D.caminho = null; return true; }
+        D.assistirSolver(Game.J.fase);
+        marcarTrapaca();
+        if (D.caminho) Game.comecarTentativa(0);
+        return true;
+      }
       if (c === 'KeyK') { Game.matar(); return true; }
       if (Game.nomeTela === 'jogo') {
         const m = /^Digit(\d)$/.exec(c);
@@ -75,136 +95,40 @@ const Debug = (() => {
     // ------------------------------------------------------------ BOT ------
     // Piloto automático: testa 9 direções olhando ~0,6 s pra frente e escolhe a
     // mais segura. Só enxerga o que já está na tela (avisos), como um jogador.
-    direcaoBot(alma, J) {
-      const lim = { x: Game.HW - CONFIG.alma.margemParede, y: Game.HH - CONFIG.alma.margemParede };
-      return bot(alma, J.ataques, J.t, lim, 0);
+    // Bot que segue o caminho do solver (tecla S no debug): devolve o alvo pra entrada, ou null.
+    caminho: null,
+    alvoSolver(t, out) { return D.caminho ? Solver.noCaminho(D.caminho, t, out) : null; },
+    assistirSolver(fase) {
+      const p = Solver.provar(fase);
+      D.caminho = p.caminho || null;
+      D.bot = false;
+      return p;
+    },
+    direcaoBot(corrida) {
+      return bot(corrida.alma, corrida.at, corrida.t, corrida.lim, 0, corrida.est.espelho);
     },
 
     // Joga a fase sem tela, com um "tempo de reação" (s): o bot só enxerga avisos
-    // que apareceram há pelo menos `atraso` segundos. Bom termômetro de dificuldade.
+    // que apareceram há pelo menos `atraso` segundos. Usa a MESMA simulação do jogo.
     simularBot(fase, atraso) {
       const comp = Patterns.compilar(fase, CONFIG.caixa);
-      const at = new Patterns.Ataques(comp);
-      const lim = { x: comp.hw - CONFIG.alma.margemParede, y: comp.hh - CONFIG.alma.margemParede };
-      const alma = { x: 0, y: 0 };
-      const dt = 1 / 60, v = CONFIG.alma.velocidade;
-      const lixo = [], moedas = [];
-      let raspoes = 0;
-      for (let tt = 0; tt < comp.duracao; tt += dt) {
-        const d = bot(alma, at, tt, lim, atraso);
-        const ox = alma.x, oy = alma.y;
-        alma.x = Math.max(-lim.x, Math.min(lim.x, alma.x + d.x * v * dt));
-        alma.y = Math.max(-lim.y, Math.min(lim.y, alma.y + d.y * v * dt));
-        at.atualizar(tt + dt, dt, alma);
-        for (let k = 1; k <= 3; k++) {
-          const f = k / 3;
-          lixo.length = 0;
-          const m = at.testar(tt + dt * f, ox + (alma.x - ox) * f, oy + (alma.y - oy) * f,
-            CONFIG.alma.raioHitbox, CONFIG.alma.raioRaspao, lixo, moedas);
-          raspoes += lixo.length;
-          if (m) return { venceu: false, t: tt, pct: Math.floor(tt / comp.duracao * 100), batida: tt / comp.B, raspoes, ev: fase.eventos[m.s.ev], x: alma.x, y: alma.y };
-        }
+      const r = new Sim.Corrida(comp);
+      const ent = { dx: 0, dy: 0, local: true };   // o bot já pensa nas coordenadas da caixa
+      const dt = 1 / 60;
+      for (let tt = dt; r.estado === 'jogando' && tt < comp.duracao + 1; tt += dt) {
+        const d = bot(r.alma, r.at, r.t, r.lim, atraso, r.est.espelho);
+        ent.dx = d.x; ent.dy = d.y;
+        r.passo(tt, ent);
       }
-      return { venceu: true, pct: 100, raspoes, moedas: moedas.length };
+      if (r.estado !== 'morto') return { venceu: true, pct: 100, raspoes: r.raspoes, moedas: r.moedas.filter(Boolean).length };
+      const m = r.morte;
+      return { venceu: false, t: m.t, pct: m.pct, batida: m.t / comp.B, raspoes: r.raspoes,
+        ev: m.o && m.o.s && comp.fase.eventos[m.o.s.ev], x: m.x, y: m.y };
     },
 
-    // ------------------------------------------------------- ANALISADOR ----
-    // Prova que a fase é vencível: simula TODAS as posições alcançáveis pela alma
-    // (grade de 2 px, velocidade do teclado, movimento só em eixo = conservador).
-    // Se o conjunto alcançável nunca fica vazio, existe um caminho até o fim.
+    // Prova que a fase é vencível (o analisador mora no solver.js).
     analisar(fase, op) {
-      op = op || {};
-      const comp = Patterns.compilar(fase, CONFIG.caixa);
-      const at = new Patterns.Ataques(comp);
-      const g = op.grade || 2;
-      const v = CONFIG.alma.velocidade;
-      const dt = g / v;
-      const limX = comp.hw - CONFIG.alma.margemParede, limY = comp.hh - CONFIG.alma.margemParede;
-      const nx = Math.floor(2 * limX / g) + 1, ny = Math.floor(2 * limY / g) + 1;
-      const N = nx * ny;
-      let R = new Uint8Array(N), R2 = new Uint8Array(N);
-      const perigo = new Uint8Array(N);
-      const cx = (i) => -limX + i * g, cy = (j) => -limY + j * g;
-      R[Math.floor(ny / 2) * nx + Math.floor(nx / 2)] = 1;
-      const rH = CONFIG.alma.raioHitbox + 0.5;   // margem extra = conservador
-      const T = Patterns.TIPOS;
-      const passos = Math.ceil(comp.duracao / dt);
-      const porBatida = [];            // menor área alcançável (fração) em cada batida
-      let minFrac = 1, tMin = 0, morreuEm = null;
-      const alma = { x: 0, y: 0 };
-      for (let k = 0; k <= passos; k++) {
-        const tt = Math.min(comp.duracao, k * dt);
-        at.atualizar(tt, dt, alma);
-        perigo.fill(0);
-        for (let q = 0; q < at.n; q++) {
-          const o = at.vivos[q], s = o.s;
-          if (s.k === T.BALA) {
-            if (tt < s.t0) continue;
-            const r = s.hr + rH;
-            const i0 = Math.max(0, Math.floor((o.x - r + limX) / g)), i1 = Math.min(nx - 1, Math.ceil((o.x + r + limX) / g));
-            const j0 = Math.max(0, Math.floor((o.y - r + limY) / g)), j1 = Math.min(ny - 1, Math.ceil((o.y + r + limY) / g));
-            for (let j = j0; j <= j1; j++) for (let i = i0; i <= i1; i++) {
-              const dx = cx(i) - o.x, dy = cy(j) - o.y;
-              if (dx * dx + dy * dy < r * r) perigo[j * nx + i] = 1;
-            }
-          } else if (s.k === T.PAREDE) {
-            if (tt < s.t0 || tt >= s.tF) continue;
-            // meio-plano: tudo além da borda (mais a folga) é perigo
-            const e = Patterns.bordaParede(s, tt);
-            const lim = s.lado < 0 ? e - CONFIG.ataques.folgaHitbox + rH : e + CONFIG.ataques.folgaHitbox - rH;
-            if (s.eixo === 'h') {
-              for (let i = 0; i < nx; i++) {
-                const x = cx(i);
-                if (s.lado < 0 ? x < lim : x > lim) for (let j = 0; j < ny; j++) perigo[j * nx + i] = 1;
-              }
-            } else {
-              for (let j = 0; j < ny; j++) {
-                const y = cy(j);
-                if (s.lado < 0 ? y < lim : y > lim) for (let i = 0; i < nx; i++) perigo[j * nx + i] = 1;
-              }
-            }
-          } else if (s.k === T.LASER && s.eixoAlinhado) {
-            if (tt < s.t0 || tt >= s.t1) continue;
-            const p = s.p0 + (s.p1 - s.p0) * (tt - s.t0) / (s.t1 - s.t0);
-            const r = s.hr + rH;
-            if (s.ang === -90) {
-              for (let i = 0; i < nx; i++) if (Math.abs(cx(i) - p) < r) for (let j = 0; j < ny; j++) perigo[j * nx + i] = 1;
-            } else {
-              for (let j = 0; j < ny; j++) if (Math.abs(cy(j) - p) < r) for (let i = 0; i < nx; i++) perigo[j * nx + i] = 1;
-            }
-          } else if (s.k === T.LASER || s.k === T.MURO) {
-            if (at.distancia(o, tt, 0, 0) === Infinity) continue;
-            for (let j = 0; j < ny; j++) for (let i = 0; i < nx; i++) {
-              if (perigo[j * nx + i]) continue;
-              if (at.distancia(o, tt, cx(i), cy(j)) < rH) perigo[j * nx + i] = 1;
-            }
-          }
-        }
-        // R2 = dilata(R) ∩ seguro
-        let area = 0;
-        for (let j = 0; j < ny; j++) for (let i = 0; i < nx; i++) {
-          const id = j * nx + i;
-          let r = R[id] || (i > 0 && R[id - 1]) || (i < nx - 1 && R[id + 1]) || (j > 0 && R[id - nx]) || (j < ny - 1 && R[id + nx]);
-          r = r && !perigo[id] ? 1 : 0;
-          R2[id] = r; area += r;
-        }
-        const tmp = R; R = R2; R2 = tmp;
-        const frac = area / N;
-        const b = Math.floor(tt / comp.B);
-        if (tt > 1.5 && (porBatida[b] === undefined || frac < porBatida[b])) porBatida[b] = frac;
-        if (tt > 2 && frac < minFrac) { minFrac = frac; tMin = tt; }
-        if (area === 0) { morreuEm = tt; break; }
-      }
-      // avisos curtos demais
-      const avisosCurtos = [];
-      for (const s of comp.specs) {
-        if (s.k === T.BALA && s.av === null) continue;          // balas de espiral/anel: o emissor avisa
-        if (s.k === T.MOEDA || s.k === T.ORBE || s.k === T.EMISSOR) continue;
-        const a = s.t0 - s.tA;
-        if (fase.dificuldade !== 'demonio' && a < Math.max(CONFIG.ataques.avisoMinimoS, comp.B) - 1e-6) avisosCurtos.push({ batida: s.batida, aviso: a });
-      }
-      analise = { fase: fase.id, ok: morreuEm === null, morreuEm, minFrac, tMin, batidaMin: tMin / comp.B,
-        pctMin: tMin / comp.duracao * 100, porBatida, avisosCurtos, specs: comp.specs.length, duracao: comp.duracao };
+      analise = Solver.analisar(fase, op);
       return analise;
     },
   };
@@ -214,7 +138,8 @@ const Debug = (() => {
   const HORIZ = [0.017, 0.035, 0.06, 0.13, 0.22, 0.32, 0.44, 0.58, 0.72, 0.9, 1.1, 1.4, 1.8];
   const DURS = [0.05, 0.15, 0.3, 0.45, 0.6, 0.8, 1.0];
   const ESPERAS = [0, 0.2, 0.4];
-  function bot(alma, at, tt, lim, atraso) {
+  function bot(alma, at, tt, lim, atraso, espelho) {
+    const q = { x: 0, y: 0 };
     const v = CONFIG.alma.velocidade;
     let melhor = { x: 0, y: 0 }, melhorNota = -Infinity;
     for (let dx = -1; dx <= 1; dx++) for (let dy = -1; dy <= 1; dy++) {
@@ -231,7 +156,9 @@ const Debug = (() => {
           for (let i = 0; i < at.n; i++) {
             const o = at.vivos[i];
             if (o.s.k === Patterns.TIPOS.MOEDA || o.s.tA > tt - atraso) continue;
-            let d = at.distancia(o, tt + h, px, py) - CONFIG.alma.raioHitbox - exige;
+            let d = at.distancia(o, tt + h, px, py);
+            if (espelho) { Patterns.espelhar(espelho, px, py, q); d = Math.min(d, at.distancia(o, tt + h, q.x, q.y)); }
+            d -= CONFIG.alma.raioHitbox + exige;
             if (h <= 0.25 && d < 0) d *= 4;
             if (d < folga) folga = d;
           }
@@ -249,7 +176,7 @@ const Debug = (() => {
     return melhor;
   }
 
-  D._bot = (alma, at, tt, lim, atraso) => bot(alma, at, tt, lim, atraso);
+  D._bot = (alma, at, tt, lim, atraso, espelho) => bot(alma, at, tt, lim, atraso, espelho);
 
   function marcarTrapaca() { if (Game.J) Game.J.trapaca = true; }
 

@@ -119,6 +119,121 @@ Fase 4, Dodge ID e online: contas, perfis públicos, upload com aprovação, pub
 
 ---
 
+# OVERHAUL (ampliação, pedido em 17/11/2026)
+> Prompt do overhaul salvo na íntegra. Tudo acima continua valendo; isto amplia.
+> Pedidos extras do usuário junto com este prompt: **muito mais fases**, com **mais fases de cada dificuldade** (Fácil, Normal, Difícil, Demon etc.), e **todas têm que ser possíveis** (nunca impossíveis de passar). Os ataques (lasers, tiros etc.) têm que ficar **sincronizados com as músicas**, que ele gostou; as músicas podem ganhar **mais qualidade sem mudar o estilo**.
+
+Vamos fazer um overhaul completo do Dodge. Antes de qualquer coisa, leia o DESIGN.md, o CLAUDE.md e todo o código. Tudo o que está no DESIGN.md continua valendo; este prompt amplia.
+
+Objetivo: o Dodge tem que ficar muito mais viciante, cheio de fases com mecânicas diferentes, sem nenhum bug conhecido e polido em todas as áreas.
+
+## Regras que não mudam
+- Um toque = morte. Fases determinísticas. Sem seletor de dificuldade: cada fase tem a sua, de Easy a Extreme Demon.
+- Restart em menos de meio segundo. Música e jogo sempre sincronizados.
+- Moedas só compram visual. Nada dá vantagem, nada custa dinheiro real.
+- Nenhum save existente pode ser perdido: toda mudança no formato do save tem migração.
+
+## Etapa 0: auditoria (pare aqui e espere meu ok)
+Rode o jogo, leia tudo e me entregue um relatório curto:
+- O que do roadmap do DESIGN.md já existe e o que falta. Se faltar algo, inclua no plano antes das etapas novas.
+- Bugs encontrados, com como reproduzir.
+- Problemas de desempenho, código bagunçado e partes difíceis de testar.
+- Seu plano para as etapas abaixo, dividido por sessão.
+
+## Etapa 1: debugging insano (antes de qualquer conteúdo novo)
+1. Separe a lógica da renderização: uma simulação pura, sem canvas, que roda no navegador e no Node. Os testes e o solver dependem disso.
+2. Testes automáticos com o test runner nativo do Node (node --test), sem bibliotecas:
+   - Padrões de ataque dão sempre o mesmo resultado para o mesmo tempo.
+   - Código de compartilhar fase: ida e volta sem perder nada; código quebrado ou malicioso nunca trava o jogo.
+   - Save: salvar, carregar, migrar de versões antigas e recuperar de save corrompido (com backup).
+   - Cálculo de %, estrelas, moedas, missões e conquistas.
+3. Solver de fases: um bot que, usando a velocidade máxima da alma do config.js, procura numa grade da caixa (passo de 1/60 s) um caminho que sobrevive até o fim. Para cada fase ele informa:
+   - se ela é possível;
+   - o momento mais apertado (menor área segura e em que %);
+   - uma curva de "aperto" ao longo da fase, pra achar picos injustos e ajudar a classificar a dificuldade.
+   Toda fase oficial tem que passar no solver, e o editor roda o solver antes de deixar publicar. No modo debug, dá pra assistir o bot jogando.
+4. Testes de estresse:
+   - 500 restarts seguidos sem vazamento de memória e sem a música dessincronizar.
+   - 2000 projéteis na tela mantendo 60 fps, com a CPU limitada em 4× no DevTools do Chrome.
+   - Modo infinito rodando 30 minutos sem erro nem NaN.
+   - Fuzzing: entradas e eventos aleatórios no jogo e no editor.
+5. Casos de borda: morrer exatamente em 100%, dois toques no mesmo frame, trocar de aba, girar o celular, redimensionar a janela, áudio bloqueado ou interrompido (iPhone), sem internet, localStorage cheio ou desativado.
+6. Navegadores: Chrome, Firefox, Edge e Safari do iPhone. Liste o que você não conseguir testar daí, pra eu testar.
+7. Painel de debug (tecla F3): fps, ms por frame, número de objetos, uso do pool, tempo do áudio comparado ao tempo do jogo e % atual, com botões pra pular pra qualquer %, ver hitboxes, câmera lenta e invencibilidade.
+8. Captura global de erros: qualquer erro vira um aviso discreto no jogo e um registro que eu possa copiar.
+9. Mantenha um BUGS.md: cada bug com como reproduzir, a causa, a correção e o teste que impede ele de voltar.
+
+## Etapa 2: novas mecânicas
+Expanda o motor com modos da alma e novos perigos. Cada modo tem que funcionar com um dedo no celular e com teclado no PC.
+
+Modos da alma (trocados por portais no meio da fase, como no GD):
+- Livre: o modo atual.
+- Gravidade: a alma cai e pula com toque ou ↑, e o dedo arrastando move pros lados. Plataformas surgem na caixa.
+- Trilhos: a alma fica presa em 3 a 5 linhas e troca de linha deslizando pra cima ou pra baixo.
+- Escudo: a alma fica parada no centro e gira um escudo pra bloquear ataques de 4 direções (no celular, tocando no lado de onde vem o ataque).
+- Gelo: a alma desliza com inércia e quica nas paredes.
+- Mini: a alma encolhe, mas fica mais rápida e mais difícil de controlar.
+
+Novos perigos e eventos:
+- Lasers que giram, serras que quicam e blocos que caem e viram chão.
+- Zona "pare" (machuca se você se mexer) e zona "mova" (machuca se você parar), com forma e cor bem diferentes.
+- Portais de teleporte.
+- Escuridão com luz só em volta da alma.
+- Labirinto vivo dentro da caixa, com paredes que se mexem no ritmo.
+- Caixa que anda pela tela, gira e muda de formato (círculo, triângulo).
+- Câmera: zoom, tremida forte e inversão de cores no "drop" da música, respeitando a opção de reduzir efeitos.
+- Chefes: uma criatura fora da caixa que ataca em fases, com barra de vida que esvazia conforme a música avança.
+
+Tudo isso também vira evento no editor.
+
+## Etapa 3: muito mais fases
+- 6 mundos temáticos, cada um com visual, paleta e trilha próprios e uma mecânica principal: 1. Caixa (livre), 2. Gravidade, 3. Trilhos, 4. Escudo, 5. Gelo, 6. Caos (portais alternando todos os modos).
+- Cada mundo tem 5 fases + 1 chefe. Depois deles, 4 fases Demon extras, terminando num Extreme Demon final. Total: cerca de 40 fases oficiais.
+- Cada mundo apresenta a mecânica primeiro sozinha e devagar, e depois mistura com as anteriores.
+- A dificuldade sobe ao longo dos mundos, mas cada mundo tem uma fase mais tranquila no meio, pra respirar.
+- Cada fase tem nome, música própria e 3 moedas secretas, e passa no solver.
+- Classifique a dificuldade com o solver e o mapa de mortes, não no olho.
+- Faça um mundo por vez e pare pra eu jogar e aprovar antes do próximo.
+
+## Etapa 4: mais viciante
+- Marcador do recorde na barra de %, pra eu ver o momento exato em que estou passando do meu melhor.
+- Sons de marco em 50%, 75% e 90%. Morrer acima de 90% mostra "QUASE!".
+- Botão "Continuar" na tela inicial que leva direto pra última fase não vencida.
+- Ritmo de recompensas: na primeira hora, algo novo desbloqueia a cada poucos minutos (peça, emblema, fase ou conquista).
+- Missões diárias e semanais visíveis no menu, mostrando quanto falta.
+- Compartilhar resultado: depois de morrer ou vencer, um botão copia um texto tipo "Dodge • Fase X • 94% em 143 tentativas", com uma barrinha de emojis e o link do jogo.
+- Mais conquistas, emblemas, molduras e peças de personalização, incluindo itens exclusivos de cada mundo e de cada chefe.
+- Ranking por fase, se o online já existir.
+
+## Etapa 5: polimento em todas as áreas
+Passe por cada área com esta checklist e corrija tudo que não estiver no nível de um jogo comercial:
+- Game feel: controle responsivo, aceleração da alma bem ajustada, hitbox justa, feedback em cada ação.
+- Visual: paleta consistente, animação em tudo, fundo reagindo à música, transições rápidas (menos de 200 ms), perigos legíveis por forma e cor, nunca só por cor.
+- Áudio: mixagem equilibrada, música abaixando um pouco nos efeitos importantes, nenhum som estourado.
+- Menus: qualquer lugar a no máximo 2 toques, botões grandes no celular, animação ao tocar.
+- Celular: tela cheia, sem zoom nem scroll acidental, funcionando em pé e deitado (ou travando a orientação com aviso).
+- Desempenho: carrega em menos de 3 s, download inicial abaixo de 8 MB, 60 fps em celular fraco.
+- Acessibilidade: modo daltônico pros perigos, opção de reduzir flashes e tremida, tamanho de texto ajustável.
+- Textos: português e inglês completos, nenhum texto cortado.
+- Editor: desfazer/refazer, atalhos, salvamento automático e prévia rápida.
+
+## Etapa 6: QA final
+- Todos os testes passando, todas as fases passando no solver, zero erro no console.
+- O bot completa o jogo inteiro, do começo ao Extreme Demon, sem travar.
+- Relatório final: o que mudou, bugs corrigidos, métricas (fps, tamanho, tempo de carregamento) e uma lista do que eu devo testar jogando.
+
+## Como trabalhar (overhaul)
+- Siga as etapas na ordem. Pare no fim da Etapa 0, no fim da Etapa 1 e a cada mundo da Etapa 3 pra eu testar e aprovar.
+- Atualize o CLAUDE.md com o progresso a cada parte concluída, pra outra sessão continuar exatamente de onde parou se o meu limite acabar.
+- Atualize o DESIGN.md com as novas mecânicas e mantenha um CHANGELOG.md.
+- Faça commit com mensagem clara a cada parte que funcionar e dê push no fim de cada sessão.
+- Faça edições pontuais. Não reescreva arquivos inteiros sem necessidade.
+- Se precisar instalar alguma ferramenta (ex.: Playwright pra testar no navegador), me pergunte antes.
+- No fim de cada etapa, me diga o que testar e o que eu devo sentir jogando.
+- **Fale sempre em português.**
+
+---
+
 ## Decisões
 _(registro de decisões tomadas durante o desenvolvimento; a mais recente embaixo)_
 
@@ -135,3 +250,16 @@ _(registro de decisões tomadas durante o desenvolvimento; a mais recente embaix
 - 2026-11-17 — **Pausa** para a música; ao continuar há contagem 3-2-1 e a música volta exatamente da posição pausada.
 - 2026-11-17 — Além das 3 músicas das fases, há uma **música de menu** curta em loop.
 - 2026-11-17 — **Verificação de fases** (`node tools/verificar-fases.js`): prova por alcançabilidade que a fase é vencível e roda bots com tempo de reação de 150/250/350 ms como termômetro de dificuldade. Modo debug usa `?debug=1`; usar debug (pular, invencível, bot) não conta recorde nem vitória.
+- 2026-11-17 — **Overhaul aprovado** (prompt salvo acima). Ordem: fundação da Etapa 1 → o que falta das Fases 2 e 3 → resto da Etapa 1 → Etapas 2 a 6. Plano por sessão no `CLAUDE.md`.
+- 2026-11-17 — **Save v2** na chave `dodge.save` (o `dodge.save.v1` da Fase 1 não é apagado: vira backup). Backup em `dodge.save.backup`; save corrompido é guardado em `dodge.save.corrompido.*`. Toda mudança de formato tem migração versionada.
+- 2026-11-17 — **Mouse 1:1**: arrastar com o mouse move a alma exatamente o que o cursor anda (o dedo continua com a sensibilidade das configurações, padrão 1,25). O arrasto é ancorado no toque/clique; a alma segue o ponto a até 1400 px/s.
+- 2026-11-17 — **Limites de fase** (`CONFIG.limites`): até 4000 eventos, 64 posições por lista, 2000 projéteis por evento e 20000 por fase. Toda fase passa pelo validador (oficial, editor ou código compartilhado).
+- 2026-11-17 — Debug (pular %, invencível, bot) não conta recorde, vitória **nem entra no mapa de mortes**.
+- 2026-11-17 — **Falar sempre em português** com o usuário.
+- 2026-11-17 — **Modificadores da caixa** (adiantados da Etapa 2, porque o editor já nasce com eles), todos como eventos: `caixa` (largura/altura de 0,2 a 1, transição em `dur` batidas), `girar` (ângulo em graus), `escuro` (nível 0–1 e raio da luz em volta da alma), `inverter` (eixos x/y) e `espelho` (eixo x, y ou xy: uma segunda alma espelhada que também morre). Viram "trilhas" de estado em função do tempo da música, como os ataques: pular pra qualquer ponto continua instantâneo. As posições dos ataques continuam relativas à caixa cheia; a parede da caixa encolhendo **empurra** a alma, não mata. Teclado e arrasto são convertidos da tela pra caixa (girada/invertida), então "direita" é sempre direita na tela. Toda mudança tem aviso: contorno tracejado do tamanho/ângulo novo, setas de inversão (e a borda fica roxa enquanto os controles estão invertidos), alma fantasma onde o espelho vai aparecer, bordas escurecendo. O analisador de fases entende tudo isso (empurrão da parede, espelho, e no teclado a alma anda um pouco menos ao longo dos eixos de uma caixa girada). Ficam pra Etapa 2: caixa que anda pela tela e muda de formato.
+- 2026-11-17 — **Editor (Sessão 2).** As fases criadas ficam em `dodge.criadas`, separadas do save (versão 1 com migrações, backup, cópia do que estragar, mescla entre abas e lixeira das últimas 10 apagadas). Uma fase criada usa uma das 3 músicas; o BPM e a duração vêm da música (a vitória é no acorde final). Trocar de música não apaga nada: o que passar do fim fica guardado e só não acontece. **Testar daqui** recomeça do ponto escolhido a cada morte e não mexe no save do jogo (nem tentativas, nem recorde, nem mapa de mortes). Layout: prévia da caixa à esquerda, inspetor à direita (paleta quando nada está selecionado), linha do tempo embaixo com régua, faixa da música (seções, bumbo, caixa, melodia) e 4 pistas de eventos (a parte escura de cada bloco é o aviso). **Atalhos:** Espaço toca/para; ←/→ move o cursor (Shift = um compasso); ↑/↓ seleciona o evento anterior/seguinte; Delete apaga; Ctrl+Z desfaz; Ctrl+Shift+Z ou Ctrl+Y refaz; Ctrl+C/Ctrl+V copia/cola no cursor; Ctrl+D duplica; T testa daqui; M troca o ímã; +/− zoom; Home/End início/fim; Esc solta a seleção (de novo: sai).
+- 2026-11-17 — **Verificar e compartilhar (Sessão 3).** Uma fase criada fica *verificada* quando o criador vence **do começo** no teste (sem debug) e o solver confirma que dá pra passar no teclado. A verificação guarda um hash do que importa pro jogo (música, BPM, duração, dificuldade, eventos): mexeu nisso, perde; mudou o nome, não. Só fase verificada gera código. **Código:** `DG<versão><Z|J>.<dados>.<soma>` — Z = JSON compactado (deflate-raw) em base64url, J = sem compactar (navegador sem CompressionStream); soma FNV-1a pra pegar código cortado. Ler um código nunca confia nele: tamanho máximo antes (200 mil caracteres) e depois de descompactar (1 MB), JSON, música conhecida, validador de fases, filtro no nome. Código de fase verificada importa como verificada (sem servidor, confia no criador; na Fase 4 o servidor confere). **Filtro de palavrão:** palavra inteira ou começo de palavra, com exceções, depois de normalizar acento, leetspeak, letra repetida e letra separada; nome digitado com palavrão é recusado; nome importado vira "FASE IMPORTADA". Fase criada jogada pela lista conta recorde/tentativas no save (pelo id `u-…`), mas não dá estrela.
+- 2026-11-17 — **Progressão (Sessão 4).** Moeda comum: 1 por raspão, 1 por % novo de recorde, vitória (1ª vez por dificuldade: 40/60/90/130/180/300; repetida: 10). Só fase oficial, sem debug e fora do teste do editor (fase criada não paga, pra não virar fazenda). Save v3: `moedas`, `moedasTotal`, `pecas` (as que a pessoa tem), `conquistas` (id → quando), `missoes`; a migração da v2 dá as moedas do que já foi feito. Missões: 3 diárias + 2 semanais, sorteadas pela data (todo mundo tem as mesmas no mesmo dia; a semana começa na segunda); "chegue a X%" guarda o máximo, as outras somam. Conquistas pagam moedas e algumas liberam peças raras (as peças raras não se compram). Avatar em 7 categorias (corpo, padrão, olhos, boca, cabeça, extra, rastro), uma camada de cada, cor livre (16 cores; a cor vermelha não pode no corpo porque rosa/vermelho é perigo). A hitbox não muda com o visual. Telas: VISUAL (guarda-roupa, loja e coleção numa só, com prova antes de comprar) e MISSÕES (missões + conquistas), com botões no hub da lista de fases.
+- 2026-11-17 — **Sessão 5.** *Treino*: checkpoints manuais (C/bandeira; V tira), guardam tempo e posição da alma; nada do treino vai pro save. *Infinito*: música em loop (Correnteza), cada volta é um segmento gerado por (semente, volta); nada cruza a virada (10 batidas livres no fim), ataques na batida cheia, nível de 0,2 a 1 em 6 voltas; troca de segmento recompila e continua com a alma onde está; recorde = tempo total aguentado (`Save.dados.infinito`). Moedas de raspão e missões contam no infinito. *Demônios* abrem com 20★ (`CONFIG.progressao.estrelasDemon`). *Perfil local*: nick (até 16 letras, filtro), efeito do nick (comprado; faíscas pela conquista COMBO!), emblema (uma conquista liberada), moldura (marcos: 1 vitória, 3 vitórias, 3 moedas de uma fase, 10 missões, vencer um Demônio). *Idioma*: `Save.config.idioma` (null = navegador: português → pt, o resto → en); texto que faltar em inglês cai no português.
+- 2026-11-17 — **Solver (Sessão 6).** Passo de 1/60 s (`CONFIG.solver.passo`), grade centrada de v/60 = 2,75 px (a alma anda no máximo uma célula por passo, só em eixo: conservador), hitbox +0,5 px. Uma célula só vale se está livre no passo atual E no anterior (a alma fica a salvo durante o passo inteiro), e cada perigo é conferido no último instante em que ainda está ativo. "Vencível" = o conjunto alcançável nunca fica vazio. **Prova construtiva** (`Solver.provar`): refaz um caminho de trás pra frente e joga a fase seguindo ele na `Sim.Corrida`; se morrer numa teleguiada (que mira na alma de verdade), refaz com as miras presas ao caminho anterior (até 3 passadas). Fase oficial tem que ser vencível **e** provada; teleguiada com curva (guia > 0) não entra na prova construtiva (a curva depende do caminho) — fase oficial que use isso precisa de outra prova (bot) ou de folga visível. O editor continua exigindo vitória do criador + vencível.
+- 2026-11-17 — **F3** abre o painel de debug a qualquer hora (fechar desliga invencível/bot/solver/câmera lenta). Usar debug continua não contando recorde, vitória, moedas nem mapa de mortes.

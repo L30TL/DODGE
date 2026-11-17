@@ -12,7 +12,7 @@ const path = require('path');
 
 const raiz = path.join(__dirname, '..');
 const ctx = vm.createContext({ console, Math, Uint8Array, Float32Array, Array, Object, JSON, Infinity, performance: { now: () => Date.now() } });
-for (const f of ['config.js', 'patterns.js', 'levels.js', 'debug.js']) {
+for (const f of ['config.js', 'patterns.js', 'sim.js', 'levels.js', 'solver.js', 'debug.js']) {
   vm.runInContext(fs.readFileSync(path.join(raiz, f), 'utf8'), ctx, { filename: f });
 }
 const ids = process.argv.slice(2);
@@ -28,6 +28,11 @@ for (const fase of fases) {
   if (a.avisosCurtos.length) console.log('  avisos curtos:', a.avisosCurtos.slice(0, 8).map(x => `b${x.batida}:${x.aviso.toFixed(2)}s`).join(' '));
   console.log('  aperto por batida (· folgado  ░ ▒ ▓ █ apertado):');
   for (let i = 0; i < barra.length; i += 64) console.log('  ' + String(i).padStart(4) + ' ' + barra.slice(i, i + 64));
+  // prova construtiva: o caminho do solver jogado na simulação de verdade
+  const prova = vm.runInContext('Solver.provar', ctx)(fase);
+  console.log(prova.ok ? `  PROVADA ✓ (o caminho do solver vence o jogo de verdade${prova.passadas > 1 ? ', ' + prova.passadas + ' passadas' : ''})`
+    : `  não provada: ${prova.morte ? 'o caminho morre na batida ' + (prova.morte.t / (60 / fase.bpm)).toFixed(1) : 'sem caminho'} (teleguiada com curva não entra na prova)`);
+  if (!fase.debug && !prova.ok) falhou = true;
   const bots = [0.15, 0.25, 0.35].map(r => ({ r, res: vm.runInContext('Debug.simularBot', ctx)(fase, r) }));
   console.log('  bot (tempo de reação): ' + bots.map(({ r, res }) => `${Math.round(r * 1000)} ms → ${res.venceu ? 'venceu' : 'morreu em ' + res.pct + '% (batida ' + res.batida.toFixed(1) + ')'}`).join(' · '));
   if (process.env.DETALHE) for (const { r, res } of bots) if (!res.venceu) console.log(`    ${Math.round(r * 1000)} ms: alma em (${res.x.toFixed(0)}, ${res.y.toFixed(0)}) atingida por`, JSON.stringify(res.ev));

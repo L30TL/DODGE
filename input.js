@@ -11,7 +11,9 @@ const Input = (() => {
   const seguradas = {};                 // código da tecla -> true
   let canvas = null;
   let destino = null;                   // função(evento) da tela atual
-  const arrasto = { id: null, x: 0, y: 0, dx: 0, dy: 0 };  // dx/dy acumulados em px lógicos
+  // arrasto atual: total andado desde que o dedo/mouse encostou (px lógicos)
+  const arrasto = { id: null, x: 0, y: 0, totalX: 0, totalY: 0, sessao: 0, tipo: 'touch' };
+  const dedos = new Map();              // ponteiros encostados: id -> {x, y} (pra trocar de dedo)
   let usouToque = false;
 
   const MAPA = {
@@ -33,53 +35,80 @@ const Input = (() => {
   }
 
   function emitir(e) { if (destino) destino(e); }
+  // elementos HTML por cima do jogo (painel de debug, caixa de texto): o jogo não mexe neles
+  const FORA = '.debug-painel, .entrada-texto';
+  const foraDoJogo = (ev) => !!(ev.target && ev.target.closest && ev.target.closest(FORA));
 
   function init(cv) {
     canvas = cv;
     window.addEventListener('keydown', (ev) => {
+      if (foraDoJogo(ev)) return;                       // digitando numa caixa de texto
       const k = MAPA[ev.code];
-      if (k || ev.code === 'Tab') ev.preventDefault();
+      const ctrl = ev.ctrlKey || ev.metaKey;
+      if (k || ev.code === 'Tab' || (ctrl && Input.atalhos && /^Key[ZYSDCVA]$/.test(ev.code))) ev.preventDefault();
       seguradas[ev.code] = true;
-      emitir({ t: 'tecla', k: k || null, code: ev.code, repetida: ev.repeat });
+      emitir({ t: 'tecla', k: k || null, code: ev.code, repetida: ev.repeat, ctrl, shift: ev.shiftKey });
     });
     window.addEventListener('keyup', (ev) => { seguradas[ev.code] = false; });
-    window.addEventListener('blur', () => { for (const c in seguradas) seguradas[c] = false; arrasto.id = null; });
+    window.addEventListener('blur', () => { for (const c in seguradas) seguradas[c] = false; arrasto.id = null; dedos.clear(); });
 
     // ponteiros na janela inteira: dá pra arrastar fora do canvas (bordas pretas)
     const alvo = document;
     alvo.addEventListener('pointerdown', (ev) => {
-      if (ev.target && ev.target.closest && ev.target.closest('.debug-painel')) return;
+      if (foraDoJogo(ev)) return;
       if (ev.pointerType === 'touch') usouToque = true;
-      if (arrasto.id === null) { arrasto.id = ev.pointerId; arrasto.x = ev.clientX; arrasto.y = ev.clientY; }
+      dedos.set(ev.pointerId, { x: ev.clientX, y: ev.clientY });
+      if (arrasto.id === null) {
+        arrasto.id = ev.pointerId; arrasto.x = ev.clientX; arrasto.y = ev.clientY;
+        arrasto.totalX = 0; arrasto.totalY = 0; arrasto.sessao++; arrasto.tipo = ev.pointerType || 'touch';
+        // continua recebendo o movimento mesmo se o cursor sair da janela
+        try { canvas.setPointerCapture(ev.pointerId); } catch (e) { /* ok */ }
+      }
       const p = logico(ev);
       emitir({ t: 'down', x: p.x, y: p.y, id: ev.pointerId, tipo: ev.pointerType });
       if (ev.pointerType !== 'mouse') ev.preventDefault();
     }, { passive: false });
     alvo.addEventListener('pointermove', (ev) => {
+      if (dedos.has(ev.pointerId)) dedos.set(ev.pointerId, { x: ev.clientX, y: ev.clientY });
       if (ev.pointerId === arrasto.id) {
         const esc = escalaCss();
-        arrasto.dx += (ev.clientX - arrasto.x) / esc;
-        arrasto.dy += (ev.clientY - arrasto.y) / esc;
+        if (esc > 0) {                      // canvas sem tamanho (rotação): ignora, nunca vira NaN
+          arrasto.totalX += (ev.clientX - arrasto.x) / esc;
+          arrasto.totalY += (ev.clientY - arrasto.y) / esc;
+        }
         arrasto.x = ev.clientX; arrasto.y = ev.clientY;
       }
       const p = logico(ev);
       emitir({ t: 'move', x: p.x, y: p.y, id: ev.pointerId, tipo: ev.pointerType, arrastando: ev.pointerId === arrasto.id });
     }, { passive: true });
     const fim = (tipo) => (ev) => {
-      if (ev.pointerId === arrasto.id) arrasto.id = null;
+      dedos.delete(ev.pointerId);
+      if (ev.pointerId === arrasto.id) {
+        arrasto.id = null;
+        // outro dedo ainda na tela? ele continua o arrasto (B12)
+        for (const [id, p] of dedos) { arrasto.id = id; arrasto.x = p.x; arrasto.y = p.y; break; }
+      }
       const p = logico(ev);
       emitir({ t: tipo, x: p.x, y: p.y, id: ev.pointerId, tipo: ev.pointerType });
     };
     alvo.addEventListener('pointerup', fim('up'));
     alvo.addEventListener('pointercancel', fim('cancel'));
     // evita zoom/rolagem/menu de contexto no celular
-    document.addEventListener('touchmove', (ev) => { if (!(ev.target.closest && ev.target.closest('.debug-painel'))) ev.preventDefault(); }, { passive: false });
+    document.addEventListener('touchmove', (ev) => { if (!foraDoJogo(ev)) ev.preventDefault(); }, { passive: false });
+    // roda do mouse / dois dedos no touchpad (o editor rola e dá zoom na linha do tempo)
+    canvas.addEventListener('wheel', (ev) => {
+      ev.preventDefault();
+      const p = logico(ev);
+      const f = ev.deltaMode === 1 ? 16 : ev.deltaMode === 2 ? 400 : 1;
+      emitir({ t: 'roda', x: p.x, y: p.y, dx: ev.deltaX * f, dy: ev.deltaY * f, ctrl: ev.ctrlKey || ev.metaKey, shift: ev.shiftKey });
+    }, { passive: false });
     document.addEventListener('contextmenu', (ev) => ev.preventDefault());
     document.addEventListener('gesturestart', (ev) => ev.preventDefault());
   }
 
   return {
     init,
+    atalhos: false,                   // true no editor: Ctrl+Z/Y/S/D/C/V/A não vão pro navegador
     set destino(f) { destino = f; },
     get usouToque() { return usouToque; },
     temToque() { return usouToque || ('ontouchstart' in window) || navigator.maxTouchPoints > 0; },
@@ -95,13 +124,9 @@ const Input = (() => {
       return { x, y };
     },
 
-    // Movimento acumulado do dedo desde a última chamada (px lógicos).
-    consumirArrasto() {
-      const d = { dx: arrasto.dx, dy: arrasto.dy };
-      arrasto.dx = 0; arrasto.dy = 0;
-      return d;
-    },
-    descartarArrasto() { arrasto.dx = 0; arrasto.dy = 0; },
+    // Arrasto atual: { ativo, tipo ('mouse' | 'touch' | 'pen'), totalX, totalY (px lógicos desde
+    // que encostou), sessao (muda a cada novo toque) }. O jogo ancora a alma no começo do arrasto.
+    arrasto() { return { ativo: arrasto.id !== null, tipo: arrasto.tipo, totalX: arrasto.totalX, totalY: arrasto.totalY, sessao: arrasto.sessao }; },
     arrastando() { return arrasto.id !== null; },
     segurada(code) { return !!seguradas[code]; },
   };

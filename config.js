@@ -9,6 +9,8 @@
 // =============================================================================
 
 const CONFIG = {
+  versao: '0.7.0-dev',     // versão do jogo (aparece na tela inicial e no registro de erros)
+
   // ---------------------------------------------------------------- tela -----
   tela: {
     largura: 480,           // px — resolução lógica (16:9). A arte é feita nessa grade.
@@ -25,6 +27,7 @@ const CONFIG = {
     pulsoBatida: 2,         // px — quanto a borda "cresce" em cada batida
     pulsoCompasso: 4,       // px — pulso mais forte no primeiro tempo de cada compasso
     pulsoDecaimento: 10,    // quão rápido o pulso volta ao normal (maior = mais rápido)
+    raioLuz: 48,            // px — raio da luz em volta da alma quando a caixa escurece (evento "escuro")
   },
 
   // ---------------------------------------------------------------- alma -----
@@ -39,9 +42,10 @@ const CONFIG = {
 
   // ------------------------------------------------------- toque (celular) ---
   toque: {
-    sensibilidadePadrao: 1.25, // 1 = a alma anda a mesma distância que o dedo na tela
-    velocidadeMax: 560,     // px/s — limite pra alma não "teleportar" com um puxão rápido
-    bufferMax: 24,          // px — movimento acumulado máximo (evita sensação de atraso)
+    sensibilidadePadrao: 1.25, // DEDO: 1 = a alma anda a mesma distância que o dedo na tela
+    sensibilidadeMouse: 1,  // MOUSE: sempre 1:1 — a bolinha anda exatamente o que o cursor anda
+    velocidadeMax: 1400,    // px/s — limite da alma seguindo o dedo/mouse (a colisão em sub-passos
+                            //        garante que nada atravessa nada mesmo nessa velocidade)
   },
 
   // ------------------------------------------------------------ ataques ------
@@ -56,7 +60,8 @@ const CONFIG = {
     larguraLaser: 12,       // px — espessura padrão do laser
     duracaoLaser: 1,        // batidas que o laser fica ligado, se a fase não disser
     sumicoLaser: 0.12,      // s — animação do laser apagando (já não mata)
-    poolTamanho: 768,       // quantos projéteis podem existir ao mesmo tempo
+    poolMinimo: 64,         // o pool de projéteis se ajusta ao pico de cada fase; este é o mínimo
+    passoGuia: 1 / 240,     // s — passo fixo da curva das teleguiadas (não depende do fps)
   },
 
   // ------------------------------------------------------------- raspão ------
@@ -103,11 +108,100 @@ const CONFIG = {
     calibracaoBpm: 100,     // BPM do teste de calibração
     calibracaoToques: 8,    // toques válidos pra fechar a calibração
     calibracaoCompensacaoMs: 15, // ms — atraso típico do toque/tecla, descontado da calibração
+    paradoMax: 0.3,         // s — se o áudio ficar parado (iPhone interrompeu) mais que isso, o jogo pausa e pede um toque
   },
 
   // ------------------------------------------------------------ progresso ----
   progresso: {
     larguraBarra: 200,      // px — barra de % no topo
+  },
+
+  // --------------------------------------------------------------- save ------
+  save: {
+    gravarDepoisMs: 800,    // ms — mortes comuns gravam juntas depois desse tempo (recorde/vitória gravam na hora)
+    backupS: 120,           // s — de quanto em quanto tempo o backup do save é atualizado
+  },
+
+  // ------------------------------------------------------------- desenho -----
+  render: {
+    balasEmCamada: 120,     // com mais balas que isso na tela, elas são desenhadas numa camada de pixels
+  },
+
+  // ----------------------------------------------------------- simulação -----
+  sim: {
+    passoMax: 0.1,          // s — se um frame travar mais que isso, a simulação avança no máximo isso
+    subpassosMax: 24,       // colisão testada em até tantos pedaços por frame (nada atravessa nada)
+    distSubpasso: 2.5,      // px — um sub-passo a cada tanto de movimento (alma ou projétil mais rápido)
+    dtSubpasso: 1 / 240,    // s — e pelo menos um a cada tanto de tempo (a morte cai no instante certo)
+  },
+
+  // ----------------------------------------------------------- progressão ----
+  progressao: {
+    avisoS: 2.6,            // s — quanto tempo o aviso de conquista/missão fica no topo
+    estrelasDemon: 20,      // estrelas pra abrir as fases Demônio
+  },
+
+  // ------------------------------------------------------------ infinito -----
+  infinito: {
+    musica: 'correnteza',   // toca em loop; cada volta da música é um trecho novo
+    nivelInicial: 0.2,      // dificuldade da 1ª volta (0 a 1)
+    nivelPorVolta: 0.16,    // quanto sobe a cada volta (chega no máximo na 6ª)
+    calmaInicio: 6,         // batidas sem nada no começo da partida
+    folgaFim: 10,           // batidas livres antes da virada da música (nada cruza a volta)
+    respiroMin: 2,          // batidas entre um ataque e o próximo, no nível máximo
+    respiroMax: 5,          // ...e no começo
+  },
+
+  // ------------------------------------------------------------ economia -----
+  // Moedas comuns só compram VISUAL (nada dá vantagem; nada custa dinheiro de verdade).
+  // Só contam nas fases oficiais e sem debug.
+  economia: {
+    porPct: 1,              // moedas por % novo de recorde (de 40% pra 55% = 15 moedas)
+    raspao: 1,              // moedas por raspão
+    vitoria: { facil: 40, normal: 60, dificil: 90, dificilimo: 130, insano: 180, demonio: 300 }, // 1ª vitória
+    vitoriaRepetida: 10,    // vencer de novo
+    missoesPorDia: 3,
+    missoesPorSemana: 2,
+    tempoLote: 15,          // s — o tempo jogado entra nas missões de 15 em 15 s
+    pecasIniciais: ['corpo.redondo', 'olhos.ponto', 'boca.nenhuma', 'cabeca.nenhuma', 'acessorio.nenhum', 'padrao.liso', 'rastro.padrao'],
+  },
+
+  // -------------------------------------------------------------- editor -----
+  editor: {
+    gravarDepoisMs: 600,    // ms — o editor grava sozinho esse tempo depois da última mudança
+    lixeira: 10,            // fases apagadas que ficam guardadas (dá pra trazer de volta)
+    historicoMax: 200,      // passos de desfazer
+    zoomPadrao: 8,          // px por batida na linha do tempo
+    zoomMin: 2, zoomMax: 48,
+    escalaPrevia: 0.72,     // tamanho da caixa na prévia (1 = tamanho do jogo)
+    passoPos: 0.05,         // quanto uma posição anda em cada toque nas setinhas
+    imaDistPx: 6,           // px — distância em que o ímã puxa pra nota da música
+    solverMsPorFrame: 10,   // ms — quanto o solver trabalha por frame ao verificar (a tela não trava)
+  },
+
+  // ------------------------------------------------------------- código -----
+  codigo: {
+    maxTexto: 200000,       // caracteres — código maior que isso nem é lido
+    maxBytes: 1000000,      // bytes depois de descompactar (proteção contra código "bomba")
+  },
+
+  // -------------------------------------------------------------- solver -----
+  solver: {
+    passo: 1 / 60,          // s — passo de tempo do solver (em cada passo a alma anda 1 célula da grade)
+    margem: 0.5,            // px — o solver considera a hitbox da alma esse tanto maior (conservador)
+    passadas: 3,            // provar: até quantas vezes refaz o caminho com as teleguiadas mirando nele
+  },
+
+  // ------------------------------------------------------------- limites -----
+  // Proteção contra fases quebradas ou maliciosas (editor e códigos compartilhados).
+  limites: {
+    maxEventos: 4000,       // eventos numa fase
+    maxPorEvento: 2000,     // projéteis gerados por um único evento
+    maxSpecs: 20000,        // projéteis numa fase inteira
+    maxPosicoes: 64,        // itens numa lista de posições
+    maxTexto: 40,           // caracteres em nome/autor
+    bpmMin: 40, bpmMax: 300,
+    batidasMin: 4, batidasMax: 2000,
   },
 
   // --------------------------------------------------------------- textos ----
