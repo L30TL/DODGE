@@ -27,6 +27,7 @@ const CONFIG = {
     pulsoBatida: 2,         // px — quanto a borda "cresce" em cada batida
     pulsoCompasso: 4,       // px — pulso mais forte no primeiro tempo de cada compasso
     pulsoDecaimento: 10,    // quão rápido o pulso volta ao normal (maior = mais rápido)
+    raioLuz: 48,            // px — raio da luz em volta da alma quando a caixa escurece (evento "escuro")
   },
 
   // ---------------------------------------------------------------- alma -----

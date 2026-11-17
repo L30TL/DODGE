@@ -16,10 +16,7 @@ const Render = (() => {
     const pisca = ((batida * CONFIG.ataques.piscadasPorBatida) % 1) < 0.5;
     const vivos = at.vivos, n = at.n;
     // 1) avisos
-    for (let i = 0; i < n; i++) {
-      const o = vivos[i];
-      if (t < o.s.t0 || o.s.k === EMISSOR || o.s.k === ORBE) desenharAviso(ctx, o, t, hw, hh, B, pisca, op);
-    }
+    avisos(ctx, at, t, batida, op);
     // 2) paredes e muros
     for (let i = 0; i < n; i++) {
       const o = vivos[i], k = o.s.k;
@@ -51,6 +48,92 @@ const Render = (() => {
       desenharMoeda(ctx, o, t, batida);
     }
     if (op.hitbox) hitboxes(ctx, at, t, hw, hh);
+  }
+
+  // Só os avisos (o jogo redesenha por cima da escuridão: aviso sempre visível).
+  function avisos(ctx, at, t, batida, op) {
+    const hw = at.c.hw, hh = at.c.hh, B = at.c.B;
+    const pisca = ((batida * CONFIG.ataques.piscadasPorBatida) % 1) < 0.5;
+    for (let i = 0; i < at.n; i++) {
+      const o = at.vivos[i];
+      if (t < o.s.t0 || o.s.k === EMISSOR || o.s.k === ORBE) desenharAviso(ctx, o, t, hw, hh, B, pisca, op);
+    }
+  }
+
+  // ------------------------------------------------------------ escuridão --
+  // Caixa escura com luz em volta de cada alma (bw, bh = meia-largura/altura atuais).
+  // cor = cor da alma: a borda da luz é uma linha pontilhada dela (dá pra ver até onde se enxerga).
+  const sombra = { cv: null, c: null };
+  function escuridao(ctx, est, almas, bw, bh, cor) {
+    const w = Math.ceil(bw * 2), h = Math.ceil(bh * 2);
+    if (!sombra.cv) { sombra.cv = document.createElement('canvas'); sombra.c = sombra.cv.getContext('2d'); }
+    if (sombra.cv.width !== w || sombra.cv.height !== h) { sombra.cv.width = w; sombra.cv.height = h; }
+    const c = sombra.c;
+    c.globalCompositeOperation = 'source-over';
+    c.clearRect(0, 0, w, h);
+    c.globalAlpha = Math.max(0, Math.min(1, est.escuro));
+    c.fillStyle = PAL.preto;
+    c.fillRect(0, 0, w, h);
+    c.globalAlpha = 1;
+    c.globalCompositeOperation = 'destination-out';
+    for (const a of almas) {
+      // luz em dois degraus (combina com o pixel art): miolo claro e uma borda à meia-luz
+      c.globalAlpha = 0.55; c.beginPath(); c.arc(a.x + bw, a.y + bh, est.raio, 0, Math.PI * 2); c.fill();
+      c.globalAlpha = 1; c.beginPath(); c.arc(a.x + bw, a.y + bh, est.raio * 0.72, 0, Math.PI * 2); c.fill();
+    }
+    c.globalCompositeOperation = 'source-over';
+    c.globalAlpha = 1;
+    ctx.drawImage(sombra.cv, -bw, -bh);
+    // borda da luz, pontilhada (um ponto a cada ~5 px)
+    ctx.fillStyle = cor;
+    ctx.globalAlpha = 0.45 * Math.min(1, est.escuro);
+    const n = Math.max(12, Math.round(2 * Math.PI * est.raio / 5));
+    for (const a of almas) {
+      for (let k = 0; k < n; k++) {
+        const ang = k * 2 * Math.PI / n;
+        ctx.fillRect(Math.round(a.x + Math.cos(ang) * est.raio), Math.round(a.y + Math.sin(ang) * est.raio), 1, 1);
+      }
+    }
+    ctx.globalAlpha = 1;
+  }
+
+  // --------------------------------------------------- avisos dos modificadores --
+  // Desenhado no espaço da caixa (já girado), por cima da borda.
+  function avisosMods(ctx, comp, t, est, batida, bw, bh, alma) {
+    const pisca = ((batida * CONFIG.ataques.piscadasPorBatida) % 1) < 0.5;
+    const tracejado = (x, y, w, h) => {
+      for (let i = 0; i < w; i += 6) { ctx.fillRect(Math.round(x + i), Math.round(y), 3, 1); ctx.fillRect(Math.round(x + i), Math.round(y + h - 1), 3, 1); }
+      for (let i = 0; i < h; i += 6) { ctx.fillRect(Math.round(x), Math.round(y + i), 1, 3); ctx.fillRect(Math.round(x + w - 1), Math.round(y + i), 1, 3); }
+    };
+    for (const a of comp.trilhas.avisosMod) {
+      if (t < a.tA || t >= a.t0) continue;
+      const final = (t - a.tA) / Math.max(0.001, a.t0 - a.tA) > 0.75;
+      if (!pisca && !final) continue;
+      ctx.fillStyle = final ? PAL.branco : PAL.perigoClaro;
+      if (a.tipo === 'caixa') {
+        const w = comp.hw * a.largura, h = comp.hh * a.altura;
+        tracejado(-w, -h, w * 2, h * 2);
+      } else if (a.tipo === 'girar') {
+        ctx.save(); ctx.rotate((a.angulo - est.angulo) * Math.PI / 180); tracejado(-bw, -bh, bw * 2, bh * 2); ctx.restore();
+      } else if (a.tipo === 'escuro') {
+        ctx.globalAlpha = 0.35; ctx.fillStyle = PAL.preto;
+        ctx.fillRect(-bw, -bh, bw * 2, 6); ctx.fillRect(-bw, bh - 6, bw * 2, 6); ctx.fillRect(-bw, -bh, 6, bh * 2); ctx.fillRect(bw - 6, -bh, 6, bh * 2);
+        ctx.globalAlpha = 1;
+      } else if (a.tipo === 'inverter') {
+        if (a.x !== est.invX) { setas(ctx, -bw + 4, 0, 1); setas(ctx, bw - 4, 0, -1); }
+        if (a.y !== est.invY) { setasV(ctx, 0, -bh + 4, 1); setasV(ctx, 0, bh - 4, -1); }
+      } else if (a.tipo === 'espelho' && a.eixo && alma) {
+        const q = Patterns.espelhar(a.eixo, alma.x, alma.y, { x: 0, y: 0 });
+        tracejado(q.x - 6, q.y - 6, 12, 12);
+      }
+    }
+  }
+  // setinhas apontando pra dentro (controles vão inverter)
+  function setas(ctx, x, y, dir) {
+    for (let k = 0; k < 4; k++) ctx.fillRect(Math.round(x + dir * k), Math.round(y - 3 + k), 1, 7 - k * 2);
+  }
+  function setasV(ctx, x, y, dir) {
+    for (let k = 0; k < 4; k++) ctx.fillRect(Math.round(x - 3 + k), Math.round(y + dir * k), 7 - k * 2, 1);
   }
 
   function spriteBala(s, branco) {
@@ -404,5 +487,5 @@ const Render = (() => {
     ctx.fillRect(sx, sy, 1, 1);
   }
 
-  return { ataques, hitboxes };
+  return { ataques, avisos, hitboxes, escuridao, avisosMods };
 })();

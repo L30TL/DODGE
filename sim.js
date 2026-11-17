@@ -14,6 +14,20 @@ const Sim = (() => {
   const finito = Number.isFinite;
   const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
 
+  // Direção ou deslocamento na TELA → na CAIXA: controles invertidos (na tela) e caixa
+  // girada (gira ao contrário). Usado pelo teclado (aqui) e pelo arrasto (game.js).
+  function telaParaCaixa(est, dx, dy, out) {
+    if (est.invX) dx = -dx;
+    if (est.invY) dy = -dy;
+    if (est.rad) {
+      const c = Math.cos(est.rad), sn = Math.sin(est.rad);
+      const lx = dx * c + dy * sn;
+      dy = -dx * sn + dy * c; dx = lx;
+    }
+    out.x = dx; out.y = dy;
+    return out;
+  }
+
   class Corrida {
     // comp = Patterns.compilar(fase, CONFIG.caixa)
     constructor(comp) {
@@ -21,6 +35,9 @@ const Sim = (() => {
       this.at = new Patterns.Ataques(comp);
       this.alma = { x: 0, y: 0, vx: 0, vy: 0 };
       this.lim = { x: comp.hw - CONFIG.alma.margemParede, y: comp.hh - CONFIG.alma.margemParede };
+      this.est = {};                     // estado da caixa (tamanho, giro, escuro, inversão, espelho)
+      this._espelho = { x: 0, y: 0 };
+      this._dir = { x: 0, y: 0 };
       this.eventos = [];                 // saída de cada passo (reaproveitada)
       this._raspoes = [];
       this._moedas = [];
@@ -40,7 +57,17 @@ const Sim = (() => {
       const a = this.alma;
       a.x = 0; a.y = 0; a.vx = 0; a.vy = 0;
       this.eventos.length = 0;
+      this.atualizarCaixa(t0);
       this.at.reiniciar(t0, a);
+    }
+
+    // Lê os modificadores no tempo t: a caixa encolhida aperta os limites da alma.
+    atualizarCaixa(t) {
+      const e = Patterns.estadoCaixa(this.c, t, this.est);
+      const m = CONFIG.alma.margemParede;
+      this.lim.x = Math.max(2, this.c.hw * e.largura - m);
+      this.lim.y = Math.max(2, this.c.hh * e.altura - m);
+      return e;
     }
 
     get prog() { return clamp(this.t / this.c.duracao, 0, 1); }
@@ -49,7 +76,7 @@ const Sim = (() => {
     pctDe(t) { return clamp(Math.floor(t / this.c.duracao * 100), 0, 99); }
 
     // Move a alma por dt segundos.
-    // entrada = { dx, dy: direção do teclado (-1..1),
+    // entrada = { dx, dy: direção do teclado (-1..1) na TELA (local: true = já na caixa, ex. bot),
     //             temAlvo, alvoX, alvoY: ponto que o dedo/mouse está segurando (px da caixa) }
     // O alvo é seguido na hora, até CONFIG.toque.velocidadeMax (sem buffer: nada se perde).
     mover(dt, e) {
@@ -59,6 +86,10 @@ const Sim = (() => {
       let dy = e && finito(e.dy) ? clamp(e.dy, -1, 1) : 0;
       const len = Math.hypot(dx, dy);
       if (len > 1) { dx /= len; dy /= len; }
+      if (!(e && e.local)) {
+        const d = telaParaCaixa(this.est, dx, dy, this._dir);
+        dx = d.x; dy = d.y;
+      }
       const v = CONFIG.alma.velocidade;
       let mx = dx * v * dt, my = dy * v * dt;
       if (e && e.temAlvo && finito(e.alvoX) && finito(e.alvoY)) {
@@ -90,6 +121,7 @@ const Sim = (() => {
       const tIni = alvo - dts;
       const a = this.alma;
       const ox = a.x, oy = a.y;
+      const est = this.atualizarCaixa(alvo);
       this.mover(dts, entrada);
       this.at.atualizar(alvo, dts, a);
       // colisão em sub-passos: nada atravessa nada, mesmo com frame lento
@@ -105,8 +137,19 @@ const Sim = (() => {
         const f = k / passos;
         const ts = Math.min(tIni + dts * f, ultimo);
         const px = ox + (a.x - ox) * f, py = oy + (a.y - oy) * f;
-        const m = this.at.testar(ts, px, py, CONFIG.alma.raioHitbox, CONFIG.alma.raioRaspao, R, M);
-        if (m && !this.invencivel) { matou = m; mx = px; my = py; mt = ts; break; }
+        let m = this.at.testar(ts, px, py, CONFIG.alma.raioHitbox, CONFIG.alma.raioRaspao, R, M);
+        let espelhada = false;
+        if (!m && est.espelho) {
+          // alma espelhada: as duas precisam sobreviver
+          const q = Patterns.espelhar(est.espelho, px, py, this._espelho);
+          m = this.at.testar(ts, q.x, q.y, CONFIG.alma.raioHitbox, CONFIG.alma.raioRaspao, R, M);
+          espelhada = !!m;
+        }
+        if (m && !this.invencivel) {
+          matou = m; mt = ts; mx = px; my = py;
+          this._morteEspelho = espelhada;
+          break;
+        }
       }
       if (matou) {
         a.x = mx; a.y = my;
@@ -132,10 +175,13 @@ const Sim = (() => {
       this.t = finito(t) ? t : this.t;
       this.estado = 'morto';
       this.at.destaque = o;
-      this.morte = { t: this.t, pct: this.pctDe(this.t), o, x: this.alma.x, y: this.alma.y };
+      let x = this.alma.x, y = this.alma.y;
+      if (this._morteEspelho) { const q = Patterns.espelhar(this.est.espelho, x, y, this._espelho); x = q.x; y = q.y; }
+      this._morteEspelho = false;
+      this.morte = { t: this.t, pct: this.pctDe(this.t), o, x, y };
       this.eventos.push(Object.assign({ tipo: 'morte' }, this.morte));
     }
   }
 
-  return { Corrida };
+  return { Corrida, telaParaCaixa };
 })();

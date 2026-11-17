@@ -44,6 +44,12 @@ const Patterns = (() => {
     teleguiada: { de: LADOS, pos: POS, quantidade: INT(1, 64), guia: NUM(0, 1440), guiaDur: NUM(0, 16) },
     anel: { x: NUM(-1, 1), y: NUM(-1, 1), quantidade: INT(1, 128), giro: NUM(-3600, 3600), raio: NUM(2, 120) },
     moeda: { x: NUM(-1, 1), y: NUM(-1, 1), dur: NUM(0.25, 64), id: INT(0, 2) },
+    // modificadores da caixa (não geram projéteis: viram "trilhas" de estado ao longo do tempo)
+    caixa: { largura: NUM(0.2, 1), altura: NUM(0.2, 1), dur: NUM(0, 32) },
+    girar: { angulo: NUM(-1440, 1440), dur: NUM(0, 32) },
+    escuro: { nivel: NUM(0, 1), raio: NUM(12, 200), dur: NUM(0, 32) },
+    inverter: { x: 'bool', y: 'bool' },
+    espelho: { ativo: 'bool', eixo: ['x', 'y', 'xy'] },
   };
   const DIFICULDADES = ['facil', 'normal', 'dificil', 'dificilimo', 'insano', 'demonio'];
   const ehNum = (v) => typeof v === 'number' && Number.isFinite(v);
@@ -73,6 +79,7 @@ const Patterns = (() => {
       case 'espiral': return 1 + Math.max(1, Math.round((ev.dur !== undefined ? ev.dur : 4) * (ev.cadencia || 2))) * (ev.bracos || 3);
       case 'teleguiada': return ev.quantidade || 3;
       case 'anel': return 1 + (ev.quantidade || 12);
+      case 'caixa': case 'girar': case 'escuro': case 'inverter': case 'espelho': return 0;
       default: return 1;
     }
   }
@@ -153,6 +160,7 @@ const Patterns = (() => {
       },
     };
     fase.eventos.forEach((ev, idx) => {
+      if (MODIFICADORES[ev.tipo]) return;          // viram trilhas (abaixo)
       const g = GERADORES[ev.tipo];
       if (!g) { if (typeof console !== 'undefined') console.warn('[Dodge] tipo de evento desconhecido:', ev.tipo); return; }
       g(ev, C, idx);
@@ -161,7 +169,93 @@ const Patterns = (() => {
     let velMax = 0;
     for (const s of specs) if (s.k === BALA) velMax = Math.max(velMax, Math.hypot(s.vx, s.vy), s.vel || 0);
     for (const s of specs) if (s.k === MURO) velMax = Math.max(velMax, s.vel);
-    return { specs, duracao: fase.duracaoBatidas * B, B, hw, hh, velMax, maxVivos: maxSimultaneos(specs), fase, avisos };
+    const trilhas = montarTrilhas(fase.eventos, C);
+    return { specs, duracao: fase.duracaoBatidas * B, B, hw, hh, velMax, maxVivos: maxSimultaneos(specs), fase, avisos, trilhas };
+  }
+
+  // ===================================================== MODIFICADORES =====
+  // Cada modificador muda uma "trilha" de estado: tamanho, ângulo, escuridão da caixa,
+  // inversão dos controles, alma espelhada. O estado também é função do tempo.
+  const MODIFICADORES = { caixa: 1, girar: 1, escuro: 1, inverter: 1, espelho: 1 };
+
+  function montarTrilhas(eventos, C) {
+    const tr = { largura: [], altura: [], angulo: [], escuro: [], raio: [], invX: [], invY: [], espelho: [] };
+    const avisosMod = [];
+    const lista = eventos.map((ev, idx) => ({ ev, idx })).filter(x => MODIFICADORES[x.ev.tipo])
+      .sort((a, b) => a.ev.batida - b.ev.batida || a.idx - b.idx);
+    const raioPadrao = CONFIG.caixa.raioLuz;
+    const tween = (trilha, padrao, t0, dur, para) => {
+      const de = valorTrilha(trilha, t0, padrao);
+      trilha.push({ t0, t1: t0 + dur, de, para });
+    };
+    const degrau = (trilha, t0, valor) => trilha.push({ t0, t1: t0, de: valor, para: valor });
+    for (const { ev, idx } of lista) {
+      const t0 = C.t(ev.batida), dur = (ev.dur || 0) * C.B, av = C.aviso(ev);
+      const aviso = { tipo: ev.tipo, tA: t0 - av, t0, t1: t0 + dur, ev: idx };
+      switch (ev.tipo) {
+        case 'caixa': {
+          const nada = ev.largura === undefined && ev.altura === undefined;
+          const l = nada ? 1 : ev.largura, a = nada ? 1 : ev.altura;
+          aviso.largura = l !== undefined ? l : valorTrilha(tr.largura, t0, 1);
+          aviso.altura = a !== undefined ? a : valorTrilha(tr.altura, t0, 1);
+          if (l !== undefined) tween(tr.largura, 1, t0, dur, l);
+          if (a !== undefined) tween(tr.altura, 1, t0, dur, a);
+          break;
+        }
+        case 'girar':
+          aviso.angulo = ev.angulo || 0;
+          tween(tr.angulo, 0, t0, dur, ev.angulo || 0);
+          break;
+        case 'escuro':
+          aviso.nivel = ev.nivel !== undefined ? ev.nivel : 0.9;
+          tween(tr.escuro, 0, t0, dur, aviso.nivel);
+          if (ev.raio !== undefined) tween(tr.raio, raioPadrao, t0, dur, ev.raio);
+          break;
+        case 'inverter':
+          aviso.x = ev.x === true; aviso.y = ev.y === true;
+          degrau(tr.invX, t0, aviso.x); degrau(tr.invY, t0, aviso.y);
+          break;
+        case 'espelho':
+          aviso.eixo = ev.ativo === false ? '' : (ev.eixo || 'x');
+          degrau(tr.espelho, t0, aviso.eixo);
+          break;
+      }
+      avisosMod.push(aviso);
+    }
+    return { tr, avisosMod };
+  }
+
+  // Valor de uma trilha no tempo t (transição suave entre o valor anterior e o novo).
+  function valorTrilha(trilha, t, padrao) {
+    let seg = null;
+    for (let i = trilha.length - 1; i >= 0; i--) if (trilha[i].t0 <= t) { seg = trilha[i]; break; }
+    if (!seg) return padrao;
+    if (t >= seg.t1) return seg.para;
+    const u = (t - seg.t0) / (seg.t1 - seg.t0), e = u * u * (3 - 2 * u);
+    return typeof seg.de === 'number' ? seg.de + (seg.para - seg.de) * e : seg.para;
+  }
+
+  // Estado da caixa no tempo t (out é reaproveitado: nada é alocado por frame).
+  function estadoCaixa(comp, t, out) {
+    out = out || {};
+    const tr = comp.trilhas.tr;
+    out.largura = valorTrilha(tr.largura, t, 1);
+    out.altura = valorTrilha(tr.altura, t, 1);
+    out.angulo = valorTrilha(tr.angulo, t, 0);
+    out.rad = out.angulo * Math.PI / 180;
+    out.escuro = valorTrilha(tr.escuro, t, 0);
+    out.raio = valorTrilha(tr.raio, t, CONFIG.caixa.raioLuz);
+    out.invX = valorTrilha(tr.invX, t, false);
+    out.invY = valorTrilha(tr.invY, t, false);
+    out.espelho = valorTrilha(tr.espelho, t, '');
+    return out;
+  }
+
+  // Onde fica a alma espelhada (eixo 'x' espelha esquerda↔direita).
+  function espelhar(eixo, x, y, out) {
+    out.x = eixo === 'y' ? x : -x;
+    out.y = eixo === 'x' ? y : -y;
+    return out;
   }
 
   // Maior número de specs vivas ao mesmo tempo (dimensiona o pool: nada é descartado).
@@ -618,5 +712,6 @@ const Patterns = (() => {
     return s.recolhida;
   }
 
-  return { compilar, validar, Ataques, GERADORES, ESQUEMA, TIPOS: { BALA, LASER, PAREDE, MURO, ORBE, EMISSOR, MOEDA }, bordaParede };
+  return { compilar, validar, Ataques, GERADORES, ESQUEMA, MODIFICADORES, TIPOS: { BALA, LASER, PAREDE, MURO, ORBE, EMISSOR, MOEDA },
+    bordaParede, estadoCaixa, espelhar };
 })();

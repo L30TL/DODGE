@@ -369,6 +369,21 @@ const Levels = (() => {
       { batida: 92, tipo: 'anel', x: -0.5, y: -0.4, quantidade: 10, vel: 110, giro: 18, aviso: 2 },
       { batida: 92, tipo: 'anel', x: 0.5, y: 0.4, quantidade: 10, vel: 110, aviso: 2 },
       { batida: 100, tipo: 'moeda', x: 0.8, y: -0.7, dur: 6, id: 0 },
+      // modificadores da caixa
+      { batida: 104, tipo: 'caixa', largura: 0.6, altura: 0.7, dur: 2, aviso: 2 },
+      { batida: 108, tipo: 'chuva', pos: [-0.3, 0, 0.3], intervalo: 1, aviso: 2 },
+      { batida: 112, tipo: 'girar', angulo: 20, dur: 4, aviso: 2 },
+      { batida: 116, tipo: 'inverter', x: true, aviso: 2 },
+      { batida: 118, tipo: 'fogo', pos: [-0.3, 0.3], eixo: 'h', intervalo: 1, vel: 120, aviso: 2 },
+      { batida: 122, tipo: 'inverter', x: false, aviso: 1 },
+      { batida: 124, tipo: 'escuro', nivel: 0.92, dur: 2, aviso: 2 },
+      { batida: 127, tipo: 'chuva', pos: [-0.4, 0, 0.4], de: 'cima', intervalo: 1, aviso: 2 },
+      { batida: 132, tipo: 'escuro', nivel: 0, dur: 2 },
+      { batida: 134, tipo: 'espelho', eixo: 'x', aviso: 2 },
+      { batida: 138, tipo: 'laser', pos: 0.5, orient: 'v', larg: 16, aviso: 2, dur: 1 },
+      { batida: 142, tipo: 'espelho', ativo: false, aviso: 1 },
+      { batida: 144, tipo: 'girar', angulo: 0, dur: 2, aviso: 1 },
+      { batida: 144, tipo: 'caixa', largura: 1, altura: 1, dur: 2, aviso: 1 },
     ],
   };
 

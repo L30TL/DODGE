@@ -152,7 +152,9 @@ const Game = (() => {
   const entrada = { dx: 0, dy: 0, temAlvo: false, alvoX: 0, alvoY: 0 };
   // Arrasto ancorado: no começo do toque/clique, guarda onde a alma estava; a alma vai pra
   // âncora + o quanto o dedo/mouse andou. Mouse é sempre 1:1; dedo usa a sensibilidade.
-  const pega = { sessao: -1, ancX: 0, ancY: 0, reancorar: false };
+  const pega = { sessao: -1, ultX: 0, ultY: 0, alvoX: 0, alvoY: 0, reancorar: false };
+  const almaEspelho = { x: 0, y: 0 };
+  const dirArrasto = { x: 0, y: 0 };
 
   // Estado VISUAL da alma (posição copiada da simulação a cada frame).
   const alma = {
@@ -184,13 +186,24 @@ const Game = (() => {
     J.dica.movido = 0;
   }
 
+  // Ponto da caixa → tela (a caixa pode estar girada). Devolve sempre o mesmo objeto.
+  const pTela = { x: 0, y: 0 };
+  function naTela(x, y) {
+    const r = J.corrida ? J.corrida.est.rad : 0;
+    if (!r) { pTela.x = CX + x; pTela.y = CY + y; return pTela; }
+    const co = Math.cos(r), si = Math.sin(r);
+    pTela.x = CX + x * co - y * si; pTela.y = CY + x * si + y * co;
+    return pTela;
+  }
+
   function aoEventoAtaque(o) {
     const s = o.s;
     if (s.som) Sound.sfx(s.som);
     if (s.tremida) tremer(s.tremida);
     if (s.flash) flash(s.flash, PAL.perigoClaro);
     if (s.k === Patterns.TIPOS.ORBE) {
-      Particulas.explosao(CX + s.x, CY + s.y, 14, PAL.perigoClaro, 90, 0.35);
+      const p = naTela(s.x, s.y);
+      Particulas.explosao(p.x, p.y, 14, PAL.perigoClaro, 90, 0.35);
     }
   }
 
@@ -227,20 +240,21 @@ const Game = (() => {
     const sens = ar.tipo === 'mouse' ? CONFIG.toque.sensibilidadeMouse
       : (Save.config.sensibilidadeToque || CONFIG.toque.sensibilidadePadrao);
     if (ar.sessao !== pega.sessao) {
-      // começou a arrastar: a âncora é onde a alma estava no clique (o que o cursor já andou conta)
-      pega.sessao = ar.sessao;
-      pega.ancX = alma.x; pega.ancY = alma.y;
+      // começou a arrastar: o alvo parte de onde a alma estava no clique (o que o cursor já andou conta)
+      pega.sessao = ar.sessao; pega.alvoX = alma.x; pega.alvoY = alma.y; pega.ultX = 0; pega.ultY = 0;
     } else if (pega.reancorar) {
-      // a alma voltou pro centro com o dedo ainda na tela (nova tentativa): ancora de novo daqui
-      pega.ancX = alma.x - ar.totalX * sens; pega.ancY = alma.y - ar.totalY * sens;
+      // a alma voltou pro centro com o dedo ainda na tela (nova tentativa): recomeça daqui
+      pega.alvoX = alma.x; pega.alvoY = alma.y; pega.ultX = ar.totalX; pega.ultY = ar.totalY;
     }
     pega.reancorar = false;
-    let ax = pega.ancX + ar.totalX * sens, ay = pega.ancY + ar.totalY * sens;
-    // passou da parede: a âncora acompanha, então voltar o dedo move a alma na hora
+    // quanto o dedo/mouse andou desde o último frame (tela) → caixa (inversão e giro)
+    const d = Sim.telaParaCaixa(J.corrida.est, (ar.totalX - pega.ultX) * sens, (ar.totalY - pega.ultY) * sens, dirArrasto);
+    pega.ultX = ar.totalX; pega.ultY = ar.totalY;
+    // passou da parede: o alvo para na borda, então voltar o dedo move a alma na hora
     const L = J.corrida.lim;
-    if (ax > L.x) { pega.ancX -= ax - L.x; ax = L.x; } else if (ax < -L.x) { pega.ancX -= ax + L.x; ax = -L.x; }
-    if (ay > L.y) { pega.ancY -= ay - L.y; ay = L.y; } else if (ay < -L.y) { pega.ancY -= ay + L.y; ay = -L.y; }
-    entrada.temAlvo = true; entrada.alvoX = ax; entrada.alvoY = ay;
+    pega.alvoX = Math.max(-L.x, Math.min(L.x, pega.alvoX + d.x));
+    pega.alvoY = Math.max(-L.y, Math.min(L.y, pega.alvoY + d.y));
+    entrada.temAlvo = true; entrada.alvoX = pega.alvoX; entrada.alvoY = pega.alvoY;
   }
 
   function atualizarJogo(dt) {
@@ -254,7 +268,7 @@ const Game = (() => {
       if (!Sound.pronto()) t = J.t + dt;          // sem áudio nenhum: relógio de reserva
       if (t < J.t) t = J.t;                       // nunca volta no tempo
       const d = Debug.bot ? Debug.direcaoBot(J.corrida) : Input.direcao();
-      entrada.dx = d.x; entrada.dy = d.y;
+      entrada.dx = d.x; entrada.dy = d.y; entrada.local = !!Debug.bot;
       calcularAlvo();
       J.corrida.invencivel = Debug.invencivel;
       const ox = alma.x, oy = alma.y;
@@ -321,19 +335,21 @@ const Game = (() => {
     alma.susto = 0.25;
     Sound.sfx('raspao', 0, J.combo - 1);
     const txt = J.combo > 1 ? t('raspouCombo', { n: J.combo }) : t('raspou');
-    Flutuantes.add(txt, CX + alma.x, CY + alma.y - 16, J.combo > 2 ? PAL.ouro : PAL.almaClara, CONFIG.raspao.textoDuracao, 1);
+    const p = naTela(alma.x, alma.y), px = p.x, py = p.y;
+    Flutuantes.add(txt, px, py - 16, J.combo > 2 ? PAL.ouro : PAL.almaClara, CONFIG.raspao.textoDuracao, 1);
     // faíscas saindo do lado do ataque
-    const ang = Math.atan2(alma.y - (o.y || 0), alma.x - (o.x || 0));
+    const ang = Math.atan2(alma.y - (o.y || 0), alma.x - (o.x || 0)) + J.corrida.est.rad;
     for (let k = 0; k < 5; k++) {
       const a = ang + (Math.random() - 0.5) * 1.6, v = 50 + Math.random() * 80;
-      Particulas.emitir(CX + alma.x, CY + alma.y, Math.cos(a) * v, Math.sin(a) * v, 0.25, PAL.almaClara, 1, 0, 3);
+      Particulas.emitir(px, py, Math.cos(a) * v, Math.sin(a) * v, 0.25, PAL.almaClara, 1, 0, 3);
     }
   }
 
   function pegarMoeda(s) {
     Sound.sfx('moeda');
-    Particulas.explosao(CX + s.x, CY + s.y, 16, PAL.ouro, 70, 0.5);
-    Flutuantes.add('+', CX + s.x, CY + s.y - 8, PAL.ouro, 0.6, 2);
+    const p = naTela(s.x, s.y);
+    Particulas.explosao(p.x, p.y, 16, PAL.ouro, 70, 0.5);
+    Flutuantes.add('+', p.x, p.y - 8, PAL.ouro, 0.6, 2);
   }
 
   function morrer(e) {
@@ -355,16 +371,17 @@ const Game = (() => {
     J.textoMorte = { pct, recorde: J.recorde, ini: tempo };
     tremer(CONFIG.juice.tremidaMorte);
     flash(CONFIG.juice.flashMorte, '#ffffff');
-    // a alma se desfaz em pixels
+    // a alma (ou o reflexo dela, se foi o reflexo que bateu) se desfaz em pixels
     const cor = Avatar.corPrincipal();
     const mult = CONFIG.morte.particulas * (reduzido() ? 0.5 : 1);
+    const m = naTela(e.x !== undefined ? e.x : alma.x, e.y !== undefined ? e.y : alma.y), mx = m.x, my = m.y;
     for (const p of Avatar.pixels(Avatar.atual())) {
       if (Math.random() > mult) continue;
       const a = Math.atan2(p.y + 0.01, p.x + 0.01), v = 40 + Math.random() * 120;
-      Particulas.emitir(CX + alma.x + p.x, CY + alma.y + p.y, Math.cos(a) * v + (Math.random() - 0.5) * 40,
+      Particulas.emitir(mx + p.x, my + p.y, Math.cos(a) * v + (Math.random() - 0.5) * 40,
         Math.sin(a) * v + (Math.random() - 0.5) * 40, 0.5 + Math.random() * 0.5, p.cor, 1, 120, 1.2);
     }
-    Particulas.explosao(CX + alma.x, CY + alma.y, 10, cor, 160, 0.4);
+    Particulas.explosao(mx, my, 10, cor, 160, 0.4);
     if (Debug.ativo) Debug.aoMorrer(pct);
   }
 
@@ -379,7 +396,8 @@ const Game = (() => {
     Sound.sfx('vitoria');
     flash(0.5, '#ffffff');
     tremer(3);
-    Particulas.explosao(CX + alma.x, CY + alma.y, 30, PAL.ouro, 140, 0.8);
+    const p = naTela(alma.x, alma.y);
+    Particulas.explosao(p.x, p.y, 30, PAL.ouro, 140, 0.8);
     // tudo que sobrou vira fumaça
     J.ataques.reiniciar(J.comp.duracao + 999, J.corrida.alma);
     J.controles.limpar();
@@ -505,17 +523,35 @@ const Game = (() => {
       const amp = Math.floor(batida) % 4 === 0 ? CONFIG.caixa.pulsoCompasso : CONFIG.caixa.pulsoBatida;
       pulso = Math.round(amp * Math.exp(-fr * CONFIG.caixa.pulsoDecaimento) * (reduzido() ? 0.5 : 1));
     }
+    const est = J.corrida.est;
+    const bw = HW * est.largura, bh = HH * est.altura;      // meia-largura/altura atuais da caixa
+    c.save();
+    c.translate(CX, CY);
+    if (est.rad) c.rotate(est.rad);
     c.fillStyle = PAL.preto;
-    c.fillRect(CX - HW, CY - HH, HW * 2, HH * 2);
+    c.fillRect(-bw, -bh, bw * 2, bh * 2);
 
     // conteúdo da caixa (com recorte)
     c.save();
-    c.translate(CX, CY);
-    c.beginPath(); c.rect(-HW, -HH, HW * 2, HH * 2); c.clip();
+    c.beginPath(); c.rect(-bw, -bh, bw * 2, bh * 2); c.clip();
     const op = { hitbox: Debug.hitbox, reduzido: reduzido(), alma, frame,
       piscaMorte: J.estado === 'morto' && Math.floor((tempo - J.tMorte) * 12) % 2 === 0 };
     Render.ataques(c, J.ataques, J.t, batida, op);
-    if (J.estado !== 'morto') desenharAlma(c);
+    const espelhoVivo = est.espelho && J.estado !== 'morto';
+    if (espelhoVivo) Patterns.espelhar(est.espelho, alma.x, alma.y, almaEspelho);
+    if (J.estado !== 'morto') {
+      desenharAlma(c);
+      if (espelhoVivo) {
+        c.globalAlpha = 0.8;
+        Avatar.desenhar(c, Avatar.atual(), Math.round(almaEspelho.x), Math.round(almaEspelho.y), 1,
+          { olharX: est.espelho === 'y' ? alma.olharX : -alma.olharX, olharY: est.espelho === 'x' ? alma.olharY : -alma.olharY });
+        c.globalAlpha = 1;
+      }
+    }
+    if (est.escuro > 0.01) {
+      Render.escuridao(c, est, espelhoVivo ? [alma, almaEspelho] : [alma], bw, bh, Avatar.corPrincipal());
+      c.globalAlpha = 0.7; Render.avisos(c, J.ataques, J.t, batida, op); c.globalAlpha = 1;   // aviso sempre visível
+    }
     if (Debug.hitbox) {
       c.strokeStyle = '#ffff00'; c.beginPath(); c.arc(alma.x, alma.y, CONFIG.alma.raioRaspao, 0, Math.PI * 2); c.stroke();
       c.strokeStyle = '#00ff66'; c.beginPath(); c.arc(alma.x, alma.y, CONFIG.alma.raioHitbox, 0, Math.PI * 2); c.stroke();
@@ -523,11 +559,11 @@ const Game = (() => {
     if (J.dica.ativa && J.estado === 'jogando') desenharDica(c);
     c.restore();
 
-    // borda da caixa (pulsa na batida)
+    // borda da caixa (pulsa na batida; roxa com os controles invertidos)
     const b = CONFIG.caixa.borda;
-    const corBorda = J.estado === 'morto' ? PAL.perigo : PAL.branco;
+    const corBorda = J.estado === 'morto' ? PAL.perigo : (est.invX || est.invY) ? PAL.roxo : PAL.branco;
     c.fillStyle = corBorda;
-    const x0 = CX - HW - b - pulso, y0 = CY - HH - b - pulso, w0 = HW * 2 + (b + pulso) * 2, h0 = HH * 2 + (b + pulso) * 2;
+    const x0 = -bw - b - pulso, y0 = -bh - b - pulso, w0 = bw * 2 + (b + pulso) * 2, h0 = bh * 2 + (b + pulso) * 2;
     c.fillRect(x0, y0, w0, b); c.fillRect(x0, y0 + h0 - b, w0, b);
     c.fillRect(x0, y0, b, h0); c.fillRect(x0 + w0 - b, y0, b, h0);
     if (pulso > 0) {
@@ -537,6 +573,8 @@ const Game = (() => {
       c.fillRect(x0 - 1, y0, 1, h0); c.fillRect(x0 + w0, y0, 1, h0);
       c.globalAlpha = 1;
     }
+    if (J.estado === 'jogando') Render.avisosMods(c, J.comp, J.t, est, batida, bw, bh, alma);
+    c.restore();
 
     Particulas.desenhar(c);
     Flutuantes.desenhar(c);

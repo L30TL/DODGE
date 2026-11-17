@@ -2,6 +2,14 @@
 
 O que mudou em cada versão. Bugs com número (B01…) estão detalhados em `BUGS.md`.
 
+## 0.3.0-dev — Overhaul, Sessões 2–3: editor (em andamento)
+
+### Mecânicas novas (eventos de fase)
+- **Caixa que encolhe/estica** (`caixa`), **gira** (`girar`), **escurece** com luz só em volta da alma (`escuro`), **controles invertidos** (`inverter`) e **alma espelhada** (`espelho`). Cada um com aviso antes de acontecer.
+- Com a caixa girada ou os controles invertidos, teclado e arrasto continuam fazendo sentido na tela.
+- O analisador de fases e os bots entendem os modificadores (toda fase continua provadamente possível).
+- Laboratório (`?debug=1`) ganhou um trecho com todos os modificadores; teste de navegador em `tools/navegador/modificadores.js`.
+
 ## 0.2.0-dev — Overhaul, Sessão 1: fundação (17/11/2026)
 
 ### Jogando

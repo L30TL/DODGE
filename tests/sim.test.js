@@ -90,3 +90,96 @@ test('todas as fases oficiais compilam sem avisos e são vencíveis pelo analisa
     assert.ok(a.ok, `${f.id} impossível em ${a.morreuEm}`);
   }
 });
+
+// ------------------------------------------------- modificadores da caixa --
+const fase40 = (id, eventos) => ({ id, bpm: 120, duracaoBatidas: 40, dificuldade: 'facil', eventos });   // 1 batida = 0,5 s
+const andar = (r, t0, t1, e) => { for (let t = t0; t <= t1 + 1e-9 && r.estado === 'jogando'; t += 1 / 60) r.passo(t, e); };
+
+test('caixa encolhendo empurra a alma pra dentro', () => {
+  const r = corridaDe(fase40('enc', [{ batida: 4, tipo: 'caixa', largura: 0.5, altura: 0.5, dur: 2 }]));
+  andar(r, 0, 1.6, { dx: 1, dy: 1 });                         // vai pro canto
+  assert.ok(Math.abs(r.alma.x - r.lim.x) < 1e-9 && Math.abs(r.alma.y - r.lim.y) < 1e-9);
+  andar(r, 1.6, 4, parado);                                    // encolhe de 2 s a 3 s
+  const m = CONFIG.alma.margemParede;
+  assert.ok(Math.abs(r.alma.x - (CONFIG.caixa.largura / 4 - m)) < 1e-9, `x = ${r.alma.x}`);
+  assert.ok(Math.abs(r.alma.y - (CONFIG.caixa.altura / 4 - m)) < 1e-9, `y = ${r.alma.y}`);
+  // no meio da transição a caixa está entre os dois tamanhos
+  r.reiniciar(2.5);
+  assert.ok(r.est.largura > 0.5 && r.est.largura < 1);
+});
+
+test('controles invertidos: direita vira esquerda (só no eixo pedido)', () => {
+  const r = corridaDe(fase40('inv', [{ batida: 2, tipo: 'inverter', x: true }]));
+  andar(r, 0, 0.5, { dx: 1, dy: 1 });
+  assert.ok(r.alma.x > 0 && r.alma.y > 0);
+  r.reiniciar(1.5);
+  andar(r, 1.5, 2, { dx: 1, dy: 1 });
+  assert.ok(r.alma.x < 0, 'x invertido');
+  assert.ok(r.alma.y > 0, 'y normal');
+  // o arrasto passa pela mesma conversão
+  const d = Sim.telaParaCaixa(r.est, 10, 4, {});
+  assert.deepStrictEqual([d.x, d.y], [-10, 4]);
+});
+
+test('caixa girada: a seta continua indo pra direita NA TELA', () => {
+  const r = corridaDe(fase40('gir', [{ batida: 2, tipo: 'girar', angulo: 90, dur: 0 }]));
+  r.reiniciar(1.5);
+  andar(r, 1.5, 2, { dx: 1, dy: 0 });
+  // com a caixa girada 90°, a direita da tela é o "pra cima" da caixa
+  const c = Math.cos(r.est.rad), s = Math.sin(r.est.rad);
+  const telaX = r.alma.x * c - r.alma.y * s, telaY = r.alma.x * s + r.alma.y * c;
+  assert.ok(telaX > 50, `tela x = ${telaX}`);
+  assert.ok(Math.abs(telaY) < 1e-6, `tela y = ${telaY}`);
+  // o bot manda direção já na caixa (local) e não é convertido
+  r.reiniciar(1.5);
+  andar(r, 1.5, 2, { dx: 1, dy: 0, local: true });
+  assert.ok(r.alma.x > 50 && Math.abs(r.alma.y) < 1e-9);
+});
+
+test('espelho: o reflexo também morre (e a morte é no lugar do reflexo)', () => {
+  const laser = { batida: 8, tipo: 'laser', pos: 0.5, orient: 'v', larg: 20, aviso: 2, dur: 1 };   // x = +72
+  const jogar = (espelho) => {
+    const ev = [laser];
+    if (espelho) ev.push({ batida: 1, tipo: 'espelho', eixo: 'x' });
+    const r = corridaDe(fase40('esp', ev));
+    andar(r, 0, 5, { temAlvo: true, alvoX: -72, alvoY: 0 });  // a alma fica do lado ESQUERDO
+    return r;
+  };
+  const sem = jogar(false);
+  assert.strictEqual(sem.estado, 'jogando');
+  const com = jogar(true);
+  assert.strictEqual(com.estado, 'morto');
+  assert.ok(Math.abs(com.morte.x - 72) < 1e-6, `morreu em x = ${com.morte.x}`);
+  assert.ok(Math.abs(com.morte.t - 4) < 0.02);
+  // desligar o espelho volta ao normal
+  const r = corridaDe(fase40('esp2', [laser, { batida: 1, tipo: 'espelho', eixo: 'x' }, { batida: 6, tipo: 'espelho', ativo: false }]));
+  andar(r, 0, 5, { temAlvo: true, alvoX: -72, alvoY: 0 });
+  assert.strictEqual(r.estado, 'jogando');
+});
+
+test('o analisador entende a caixa encolhida, o empurrão da parede e o espelho', { timeout: 120000 }, () => {
+  const D = carregar(['config.js', 'patterns.js', 'sim.js', 'levels.js', 'debug.js']).pegar('Debug');
+  const meio = { batida: 8, tipo: 'laser', pos: 0, orient: 'v', larg: 60, aviso: 2, dur: 1 };   // |x| < ~31
+  assert.ok(D.analisar(fase40('a1', [meio])).ok, 'caixa normal: dá pra fugir pro lado');
+  const a2 = D.analisar(fase40('a2', [{ batida: 2, tipo: 'caixa', largura: 0.2, dur: 0 }, meio]));
+  assert.ok(!a2.ok, 'caixa estreita: o laser cobre tudo');
+  // o centro é proibido e logo depois a caixa fecha de uma vez: a parede empurra a alma, não mata
+  const empurra = fase40('a3', [
+    { batida: 4, tipo: 'laser', pos: 0, orient: 'v', larg: 120, aviso: 2, dur: 4 },
+    { batida: 8, tipo: 'caixa', largura: 0.3, dur: 0 },                    // fecha no instante em que o laser apaga
+  ]);
+  assert.ok(D.analisar(empurra).ok, 'empurrão da parede');
+  const r = corridaDe(empurra);
+  andar(r, 0, 6, { dx: 1, dy: 0 });
+  assert.strictEqual(r.estado, 'jogando');
+  // com espelho, o lado direito (o único seguro) tem o reflexo no lado esquerdo (todo coberto)
+  const lasers = [
+    { batida: 8, tipo: 'laser', pos: -0.5, orient: 'v', larg: 120, aviso: 2, dur: 1 },
+    { batida: 8, tipo: 'laser', pos: 0, orient: 'v', larg: 20, aviso: 2, dur: 1 },
+    { batida: 8, tipo: 'laser', pos: -0.95, orient: 'v', larg: 20, aviso: 2, dur: 1 },
+  ];
+  assert.ok(D.analisar(fase40('a4', lasers)).ok, 'sem espelho: vai pra direita');
+  assert.ok(!D.analisar(fase40('a5', lasers.concat([{ batida: 1, tipo: 'espelho', eixo: 'x' }]))).ok, 'com espelho: impossível');
+  // caixa girada não muda o que é possível (só anda um pouco mais devagar no teclado)
+  assert.ok(D.analisar(fase40('a6', [{ batida: 1, tipo: 'girar', angulo: 30, dur: 2 }, meio])).ok);
+});

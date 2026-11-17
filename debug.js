@@ -76,7 +76,7 @@ const Debug = (() => {
     // Piloto automático: testa 9 direções olhando ~0,6 s pra frente e escolhe a
     // mais segura. Só enxerga o que já está na tela (avisos), como um jogador.
     direcaoBot(corrida) {
-      return bot(corrida.alma, corrida.at, corrida.t, corrida.lim, 0);
+      return bot(corrida.alma, corrida.at, corrida.t, corrida.lim, 0, corrida.est.espelho);
     },
 
     // Joga a fase sem tela, com um "tempo de reação" (s): o bot só enxerga avisos
@@ -84,10 +84,10 @@ const Debug = (() => {
     simularBot(fase, atraso) {
       const comp = Patterns.compilar(fase, CONFIG.caixa);
       const r = new Sim.Corrida(comp);
-      const ent = { dx: 0, dy: 0, ax: 0, ay: 0 };
+      const ent = { dx: 0, dy: 0, local: true };   // o bot já pensa nas coordenadas da caixa
       const dt = 1 / 60;
       for (let tt = dt; r.estado === 'jogando' && tt < comp.duracao + 1; tt += dt) {
-        const d = bot(r.alma, r.at, r.t, r.lim, atraso);
+        const d = bot(r.alma, r.at, r.t, r.lim, atraso, r.est.espelho);
         ent.dx = d.x; ent.dy = d.y;
         r.passo(tt, ent);
       }
@@ -121,10 +121,36 @@ const Debug = (() => {
       const porBatida = [];            // menor área alcançável (fração) em cada batida
       let minFrac = 1, tMin = 0, morreuEm = null;
       const alma = { x: 0, y: 0 };
+      const est = {};
+      const margem = CONFIG.alma.margemParede;
+      const meio = (lim, l, n) => {                // células [a, b] que cabem na caixa encolhida
+        let a = Math.ceil((lim - l) / g - 1e-9), b = Math.floor((lim + l) / g + 1e-9);
+        if (a > b) a = b = Math.floor(n / 2);
+        return [a, b];
+      };
+      let credito = 0;
       for (let k = 0; k <= passos; k++) {
         const tt = Math.min(comp.duracao, k * dt);
         at.atualizar(tt, dt, alma);
         perigo.fill(0);
+        Patterns.estadoCaixa(comp, tt, est);
+        // caixa encolhida: a parede empurra a alma pra dentro (igual ao jogo) e o lado de fora é proibido
+        const lx = Math.max(2, comp.hw * est.largura - margem), ly = Math.max(2, comp.hh * est.altura - margem);
+        if (lx < limX || ly < limY) {
+          const [i0, i1] = meio(limX, lx, nx), [j0, j1] = meio(limY, ly, ny);
+          for (let j = 0; j < ny; j++) for (let i = 0; i < nx; i++) {
+            if (i >= i0 && i <= i1 && j >= j0 && j <= j1) continue;
+            const id = j * nx + i;
+            perigo[id] = 1;
+            if (R[id]) { R[id] = 0; R[Math.max(j0, Math.min(j1, j)) * nx + Math.max(i0, Math.min(i1, i))] = 1; }
+          }
+        }
+        // caixa girada: no teclado a alma anda um pouco menos ao longo dos eixos da caixa
+        // (as 8 direções da tela não batem com eles). Anda 1 célula só quando juntou crédito.
+        const graus = Math.abs(est.angulo) % 45, d = Math.min(graus, 45 - graus) * Math.PI / 180;
+        credito += Math.cos(Math.PI / 8) / Math.cos(Math.PI / 8 - d);
+        const anda = credito >= 1 - 1e-9;
+        if (anda) credito -= 1;
         for (let q = 0; q < at.n; q++) {
           const o = at.vivos[q], s = o.s;
           if (s.k === T.BALA) {
@@ -169,11 +195,19 @@ const Debug = (() => {
             }
           }
         }
+        // alma espelhada: a posição só é segura se o espelho dela também for
+        if (est.espelho) {
+          const copia = perigo.slice();
+          for (let j = 0; j < ny; j++) for (let i = 0; i < nx; i++) {
+            const mi = est.espelho === 'y' ? i : nx - 1 - i, mj = est.espelho === 'x' ? j : ny - 1 - j;
+            if (copia[mj * nx + mi]) perigo[j * nx + i] = 1;
+          }
+        }
         // R2 = dilata(R) ∩ seguro
         let area = 0;
         for (let j = 0; j < ny; j++) for (let i = 0; i < nx; i++) {
           const id = j * nx + i;
-          let r = R[id] || (i > 0 && R[id - 1]) || (i < nx - 1 && R[id + 1]) || (j > 0 && R[id - nx]) || (j < ny - 1 && R[id + nx]);
+          let r = R[id] || (anda && ((i > 0 && R[id - 1]) || (i < nx - 1 && R[id + 1]) || (j > 0 && R[id - nx]) || (j < ny - 1 && R[id + nx])));
           r = r && !perigo[id] ? 1 : 0;
           R2[id] = r; area += r;
         }
@@ -203,7 +237,8 @@ const Debug = (() => {
   const HORIZ = [0.017, 0.035, 0.06, 0.13, 0.22, 0.32, 0.44, 0.58, 0.72, 0.9, 1.1, 1.4, 1.8];
   const DURS = [0.05, 0.15, 0.3, 0.45, 0.6, 0.8, 1.0];
   const ESPERAS = [0, 0.2, 0.4];
-  function bot(alma, at, tt, lim, atraso) {
+  function bot(alma, at, tt, lim, atraso, espelho) {
+    const q = { x: 0, y: 0 };
     const v = CONFIG.alma.velocidade;
     let melhor = { x: 0, y: 0 }, melhorNota = -Infinity;
     for (let dx = -1; dx <= 1; dx++) for (let dy = -1; dy <= 1; dy++) {
@@ -220,7 +255,9 @@ const Debug = (() => {
           for (let i = 0; i < at.n; i++) {
             const o = at.vivos[i];
             if (o.s.k === Patterns.TIPOS.MOEDA || o.s.tA > tt - atraso) continue;
-            let d = at.distancia(o, tt + h, px, py) - CONFIG.alma.raioHitbox - exige;
+            let d = at.distancia(o, tt + h, px, py);
+            if (espelho) { Patterns.espelhar(espelho, px, py, q); d = Math.min(d, at.distancia(o, tt + h, q.x, q.y)); }
+            d -= CONFIG.alma.raioHitbox + exige;
             if (h <= 0.25 && d < 0) d *= 4;
             if (d < folga) folga = d;
           }
@@ -238,7 +275,7 @@ const Debug = (() => {
     return melhor;
   }
 
-  D._bot = (alma, at, tt, lim, atraso) => bot(alma, at, tt, lim, atraso);
+  D._bot = (alma, at, tt, lim, atraso, espelho) => bot(alma, at, tt, lim, atraso, espelho);
 
   function marcarTrapaca() { if (Game.J) Game.J.trapaca = true; }
 
